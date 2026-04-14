@@ -144,9 +144,6 @@ Resources:
       EndpointConfiguration:
         Types:
           - REGIONAL
-      Tags:
-        - Key: Project
-          Value: rag-chatbot
 
   QueryResource:
     Type: AWS::ApiGateway::Resource
@@ -219,12 +216,7 @@ Resources:
       MethodSettings:
         - ResourcePath: "/*"
           HttpMethod: "*"
-          LoggingLevel: INFO
-          DataTraceEnabled: false
           MetricsEnabled: true
-      Tags:
-        - Key: Project
-          Value: rag-chatbot
 
   # ── CloudTrail ───────────────────────────────────────────────────────────────
 
