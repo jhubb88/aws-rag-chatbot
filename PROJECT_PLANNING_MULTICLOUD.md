@@ -1,6 +1,7 @@
 # RAG Knowledge Chatbot — Project Planning Document
 ### Multi-Cloud Edition | Last Updated: 2026-04-14
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
+**Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
 
 ---
 
@@ -80,12 +81,17 @@ CloudFormation included in MVP:
 
 ## Known Issues and Blockers
 
-### Bedrock Access — ACTIVE BLOCKER (Mitigated by Nebius)
-AWS account cannot submit Anthropic use case details form.  
+### Bedrock Titan Embeddings v2 — ✅ UNBLOCKED (2026-04-14)
+Titan Embeddings v2 confirmed live. Phase 2 ingest test gate passed end-to-end.
+Real 1536-dim vectors confirmed from `amazon.titan-embed-text-v2:0`.
+
+### Bedrock Generation (Claude 3 Haiku) — STILL BLOCKED
+AWS account cannot submit Anthropic use case details form.
 Error: "Your account is not authorized to perform this action."
+AWS Support case remains open. Nebius Llama 3.1 is the live generation path until resolved.
 
 **Mitigation Plan:**  
-Because the architecture now includes Nebius as a dual-provider, Phase 1 and the Query Pipeline (Phase 3) are **NO LONGER BLOCKED**. The build will proceed using Nebius for text generation. Bedrock integration will be built in code, but tested live only once AWS Support resolves the account-level block.
+Because the architecture includes Nebius as a dual-provider, Phase 3 (Query Pipeline) is **NOT BLOCKED**. Generation code will be built for both providers; Bedrock path will be live-tested only once AWS Support resolves the account block.
 
 Test command to verify Bedrock when resolved:
 ```bash
@@ -121,8 +127,8 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 |---|---|---|
 | Phase 0 | Planning and scaffolding | ✅ Complete |
 | Phase 1 | CloudFormation infrastructure | ✅ Complete — stack live, commit `68a92b6`, tag `v0.2-infra` |
-| Phase 2 | Document ingestion pipeline | ⏳ Not started |
-| Phase 3 | Query pipeline (Router Logic) | ⏳ Not started |
+| Phase 2 | Document ingestion pipeline | ✅ Complete — Lambda deployed, commit `61ee46e`, tag `v0.3-ingest` |
+| Phase 3 | Query pipeline (Router Logic) | ⏳ Next |
 | Phase 4 | Frontend (Dual-Provider UI) | ⏳ Not started |
 | Phase 5 | Observability | ⏳ Not started |
 | Phase 6 | Integration testing | ⏳ Not started |
@@ -131,16 +137,20 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 
 ---
 
-## Next Session — Phase 2: Document Ingestion Pipeline
+## Next Session — Phase 3: Query Pipeline (Router Logic)
 
-- Create `data/documents/` directory (gitignored — add source docs here)
-- Write `src/lambdas/ingest/handler.py`:
-  - Accept PDF/text from `data/documents/`
-  - Chunk into ~500 token segments with overlap
-  - Call Titan Embeddings v2 via Bedrock to embed each chunk
-  - Store chunks + embeddings as JSON vector index in S3 (`documents/` prefix)
-- Package and deploy ingest Lambda via CloudFormation update
-- Note: Bedrock still blocked at account level — code path will be built but live-testable only after AWS Support resolves
+1. Write `src/lambdas/query/handler.py`:
+   - Accept POST `{"query": "...", "selected_engine": "bedrock|nebius"}` from API Gateway
+   - Embed the query via Bedrock Titan Embeddings v2
+   - Load `documents/index.json` from S3
+   - Cosine similarity search — return top-K chunks as context
+   - If `bedrock`: invoke Claude 3 Haiku via `boto3` with XML prompt template
+   - If `nebius`: fetch API key from SSM, POST to Nebius AI Studio with Markdown prompt template
+   - Return JSON: `{"answer": "...", "sources": [...], "engine": "..."}`
+2. Wire query Lambda into API Gateway (replace MOCK integration in CloudFormation)
+3. Add query Lambda resources to CloudFormation template
+4. Write `scripts/smoke_test_query.py` for end-to-end validation
+5. Test gate: Nebius path must return a real answer grounded in ingested docs
 
 ---
 
@@ -206,7 +216,7 @@ Three-panel analyst console — not a chatbot, not a form.
 
 - Branch: `main` is always stable
 - Commit format: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
-- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` (next), `v0.3-ingest`, etc.
+- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` (next)
 - Never commit: `.env`, credentials, `data/documents/`
 
 ---
