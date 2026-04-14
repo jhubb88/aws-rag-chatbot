@@ -218,6 +218,105 @@ Resources:
           HttpMethod: "*"
           MetricsEnabled: true
 
+  # ── Ingest Lambda Log Group ──────────────────────────────────────────────────
+
+  IngestLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/rag-chatbot-ingest-${Environment}"
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # ── Ingest Lambda IAM Role ───────────────────────────────────────────────────
+
+  IngestLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "rag-chatbot-ingest-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: IngestLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "${IngestLambdaLogGroup.Arn}:*"
+              - Sid: S3ReadDocuments
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "${RagChatbotBucket.Arn}/documents/*"
+              - Sid: S3ReadWriteIndex
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub "${RagChatbotBucket.Arn}/documents/index.json"
+              - Sid: BedrockEmbeddings
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0"
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # ── Ingest Lambda Function ───────────────────────────────────────────────────
+  # PREREQUISITE: lambda/ingest.zip must be uploaded to the S3 bucket BEFORE
+  # running the CloudFormation deploy. The bucket (RagChatbotBucket) already
+  # exists from Phase 1, so this is a packaging step, not a bootstrap problem.
+  # See Step 7 packaging instructions before deploying.
+  #
+  # S3 event notification is NOT wired in CloudFormation due to circular
+  # dependency (bucket <-> Lambda). Use direct invoke or wire manually via
+  # console after deploy if you want automatic trigger on upload.
+
+  IngestLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - IngestLambdaLogGroup
+      - RagChatbotBucket
+    Properties:
+      FunctionName: !Sub "rag-chatbot-ingest-${Environment}"
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Role: !GetAtt IngestLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Code:
+        S3Bucket: !Ref RagChatbotBucket
+        S3Key: lambda/ingest.zip
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref RagChatbotBucket
+          ENVIRONMENT: !Ref Environment
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # Allows S3 to invoke IngestLambda — wire the bucket notification manually
+  # via console or CLI after deploy if you want automatic trigger on upload.
+  IngestLambdaS3Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt IngestLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !GetAtt RagChatbotBucket.Arn
+      SourceAccount: !Ref AWS::AccountId
+
   # ── CloudTrail ───────────────────────────────────────────────────────────────
 
   RagChatbotTrail:
