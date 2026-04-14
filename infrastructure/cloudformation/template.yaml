@@ -1,0 +1,271 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  RAG Chatbot infrastructure — Phase 1.
+  Provisions S3, Lambda execution role, API Gateway, CloudWatch Logs, and CloudTrail.
+  Bedrock permissions are included in the Lambda role but not exercised until Phase 2.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Deployment environment
+
+  NebiusApiKeyPath:
+    Type: String
+    Default: /rag-chatbot/nebius-api-key
+    Description: SSM parameter path for Nebius API key (must already exist)
+
+Resources:
+
+  # ── S3: Main bucket (documents, embeddings index, frontend) ──────────────────
+
+  RagChatbotBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "rag-chatbot-${AWS::AccountId}-${Environment}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+        - Key: Environment
+          Value: !Ref Environment
+
+  RagChatbotBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref RagChatbotBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Public read for frontend
+          - Sid: PublicReadFrontend
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub "${RagChatbotBucket.Arn}/frontend/*"
+          # CloudTrail log delivery
+          - Sid: CloudTrailAclCheck
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt RagChatbotBucket.Arn
+          - Sid: CloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub "${RagChatbotBucket.Arn}/cloudtrail/AWSLogs/${AWS::AccountId}/*"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+
+  # ── CloudWatch Log Group ─────────────────────────────────────────────────────
+
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/rag-chatbot-query-${Environment}"
+      RetentionInDays: 30
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # ── Lambda execution role ────────────────────────────────────────────────────
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "rag-chatbot-lambda-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RagChatbotLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt LambdaLogGroup.Arn
+              # S3 — documents and embeddings
+              - Sid: S3Access
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt RagChatbotBucket.Arn
+                  - !Sub "${RagChatbotBucket.Arn}/*"
+              # SSM — Nebius API key
+              - Sid: SSMGetParameter
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/rag-chatbot/*"
+              # Bedrock — Titan Embeddings (not active until Phase 2)
+              - Sid: BedrockEmbeddings
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v1"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0"
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # ── API Gateway ──────────────────────────────────────────────────────────────
+
+  RagChatbotApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "rag-chatbot-api-${Environment}"
+      Description: RAG Chatbot query API
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  QueryResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RagChatbotApi
+      ParentId: !GetAtt RagChatbotApi.RootResourceId
+      PathPart: query
+
+  QueryMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RagChatbotApi
+      ResourceId: !Ref QueryResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseTemplates:
+              application/json: '{"message": "Lambda placeholder — Phase 2"}'
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # CORS preflight
+  QueryOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RagChatbotApi
+      ResourceId: !Ref QueryResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - QueryMethod
+      - QueryOptionsMethod
+    Properties:
+      RestApiId: !Ref RagChatbotApi
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref RagChatbotApi
+      DeploymentId: !Ref ApiDeployment
+      StageName: !Ref Environment
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          LoggingLevel: INFO
+          DataTraceEnabled: false
+          MetricsEnabled: true
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # ── CloudTrail ───────────────────────────────────────────────────────────────
+
+  RagChatbotTrail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn: RagChatbotBucketPolicy
+    Properties:
+      TrailName: !Sub "rag-chatbot-trail-${Environment}"
+      S3BucketName: !Ref RagChatbotBucket
+      S3KeyPrefix: cloudtrail
+      IsLogging: true
+      EnableLogFileValidation: true
+      IncludeGlobalServiceEvents: true
+      IsMultiRegionTrail: false
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+Outputs:
+  BucketName:
+    Description: Main S3 bucket name
+    Value: !Ref RagChatbotBucket
+    Export:
+      Name: !Sub "rag-chatbot-bucket-${Environment}"
+
+  BucketWebsiteURL:
+    Description: S3 static website endpoint
+    Value: !GetAtt RagChatbotBucket.WebsiteURL
+
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${RagChatbotApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/query"
+    Export:
+      Name: !Sub "rag-chatbot-api-endpoint-${Environment}"
+
+  LambdaRoleArn:
+    Description: Lambda execution role ARN (used in Phase 2)
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub "rag-chatbot-lambda-role-${Environment}"
+
+  LogGroupName:
+    Description: Lambda CloudWatch Log Group
+    Value: !Ref LambdaLogGroup
