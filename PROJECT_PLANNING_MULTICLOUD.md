@@ -1,6 +1,6 @@
 # RAG Knowledge Chatbot — Project Planning Document
 ### Multi-Cloud Edition | Last Updated: 2026-04-14
-**Phase 1 Status:** CloudFormation template complete — commit `580660d`, validated clean
+**Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 
 ---
 
@@ -107,6 +107,12 @@ aws bedrock-runtime invoke-model \
 aws configure list --profile portfolio-user
 ```
 
+### GitHub Auth (Recurring Issue)
+`gh` CLI requires a classic PAT (`ghp_`) with `repo` and `read:org` scopes. If repo creation fails, re-authenticate:
+```bash
+echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https --with-token
+```
+
 ---
 
 ## Build Phases
@@ -114,7 +120,7 @@ aws configure list --profile portfolio-user
 | Phase | Name | Status |
 |---|---|---|
 | Phase 0 | Planning and scaffolding | ✅ Complete |
-| Phase 1 | CloudFormation infrastructure | ✅ Complete — commit `580660d`, validated clean |
+| Phase 1 | CloudFormation infrastructure | ✅ Complete — stack live, commit `68a92b6`, tag `v0.2-infra` |
 | Phase 2 | Document ingestion pipeline | ⏳ Not started |
 | Phase 3 | Query pipeline (Router Logic) | ⏳ Not started |
 | Phase 4 | Frontend (Dual-Provider UI) | ⏳ Not started |
@@ -125,13 +131,16 @@ aws configure list --profile portfolio-user
 
 ---
 
-## Next Session — Phase 1 Completion
+## Next Session — Phase 2: Document Ingestion Pipeline
 
-- Push to GitHub (tag `v0.2-infra`)
-- Deploy the CloudFormation stack: `create-stack --capabilities CAPABILITY_NAMED_IAM`
-- Verify all resources provisioned correctly (S3, API Gateway, Lambda role, CloudTrail, CloudWatch)
-- Run stack output check and confirm API endpoint URL
-- Begin Phase 2 — Document ingestion pipeline
+- Create `data/documents/` directory (gitignored — add source docs here)
+- Write `src/lambdas/ingest/handler.py`:
+  - Accept PDF/text from `data/documents/`
+  - Chunk into ~500 token segments with overlap
+  - Call Titan Embeddings v2 via Bedrock to embed each chunk
+  - Store chunks + embeddings as JSON vector index in S3 (`documents/` prefix)
+- Package and deploy ingest Lambda via CloudFormation update
+- Note: Bedrock still blocked at account level — code path will be built but live-testable only after AWS Support resolves
 
 ---
 
@@ -208,6 +217,15 @@ Three-panel analyst console — not a chatbot, not a form.
 - Read last session wrap-up before starting
 - Write session wrap-up to `sessions/YYYY-MM-DD-wrap.md` at end of every session
 - Never end a session without a wrap-up file
+
+---
+
+## Local Development Path
+
+```
+/mnt/c/Users/jimmy/Desktop/Projects/rag-chatbot/
+```
+All CC work happens here. The old ClaudeCode path is retired.
 
 ---
 
