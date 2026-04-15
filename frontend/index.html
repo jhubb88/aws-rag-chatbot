@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG Knowledge Chatbot — Analyst Console</title>
+  <style>
+    :root {
+      --color-page-bg:        #111318;
+      --color-panel-bg:       #1A1D24;
+      --color-card-bg:        #22262F;
+      --color-card-border:    #2E3340;
+      --color-accent:         #E8622A;
+      --color-success:        #10B981;
+      --color-error:          #EF4444;
+      --color-top-bar-bg:     #141720;
+      --color-input-bg:       #1E2229;
+      --color-text-primary:   #F9FAFB;
+      --color-text-secondary: #6B7280;
+      --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--color-page-bg);
+      color: var(--color-text-primary);
+      font-family: var(--font-stack);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── TOP BAR ──────────────────────────────────────────── */
+    .top-bar {
+      background: var(--color-top-bar-bg);
+      border-bottom: 1px solid var(--color-card-border);
+      padding: 0 20px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .top-bar__brand {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    .top-bar__brand span {
+      color: var(--color-accent);
+    }
+
+    .top-bar__divider {
+      width: 1px;
+      height: 22px;
+      background: var(--color-card-border);
+      flex-shrink: 0;
+    }
+
+    .kb-status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+    }
+
+    .kb-status__dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--color-success);
+      box-shadow: 0 0 6px var(--color-success);
+      flex-shrink: 0;
+    }
+
+    .top-bar__spacer { flex: 1; }
+
+    .engine-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      white-space: nowrap;
+    }
+
+    .engine-toggle select {
+      background: var(--color-card-bg);
+      color: var(--color-text-primary);
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-sm);
+      padding: 5px 10px;
+      font-size: 12px;
+      font-family: var(--font-stack);
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .engine-toggle select:focus {
+      border-color: var(--color-accent);
+    }
+
+    .btn-clear {
+      background: transparent;
+      border: 1px solid var(--color-card-border);
+      color: var(--color-text-secondary);
+      border-radius: var(--radius-sm);
+      padding: 6px 14px;
+      font-size: 12px;
+      font-family: var(--font-stack);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-clear:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    /* ── MAIN LAYOUT ───────────────────────────────────────── */
+    .main-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── LEFT SIDEBAR ──────────────────────────────────────── */
+    .sidebar {
+      width: 224px;
+      min-width: 224px;
+      background: var(--color-panel-bg);
+      border-right: 1px solid var(--color-card-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar__label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+      padding: 16px 16px 8px;
+    }
+
+    .doc-list {
+      list-style: none;
+      padding: 0 8px;
+    }
+
+    .doc-list__item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      cursor: default;
+      transition: background 0.12s, color 0.12s;
+      line-height: 1.3;
+    }
+
+    .doc-list__item:hover {
+      background: var(--color-card-bg);
+      color: var(--color-text-primary);
+    }
+
+    .doc-list__icon {
+      font-size: 12px;
+      flex-shrink: 0;
+      opacity: 0.6;
+    }
+
+    .sidebar__sep {
+      margin: 12px 16px;
+      border: none;
+      border-top: 1px solid var(--color-card-border);
+    }
+
+    .sidebar__session-placeholder {
+      padding: 0 16px 16px;
+    }
+
+    .sidebar__session-placeholder .sidebar__label {
+      padding: 0 0 8px;
+    }
+
+    .session-placeholder__empty {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      opacity: 0.45;
+      font-style: italic;
+    }
+
+    /* ── CENTER PANEL ──────────────────────────────────────── */
+    .center-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--color-page-bg);
+    }
+
+    .qa-thread {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-card-border) transparent;
+    }
+
+    .qa-thread::-webkit-scrollbar { width: 5px; }
+    .qa-thread::-webkit-scrollbar-thumb {
+      background: var(--color-card-border);
+      border-radius: 10px;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 10px;
+      color: var(--color-text-secondary);
+      padding: 60px 0;
+      text-align: center;
+    }
+
+    .empty-state__icon {
+      font-size: 38px;
+      opacity: 0.25;
+    }
+
+    .empty-state__text {
+      font-size: 13px;
+      opacity: 0.55;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+    }
+
+    .card--question  { border-left: 3px solid var(--color-accent); }
+    .card--processing { border-left: 3px solid var(--color-accent); opacity: 0.9; }
+    .card--answer    { border-left: 3px solid var(--color-success); }
+    .card--error     { border-left: 3px solid var(--color-error); }
+
+    .card__label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+
+    .card__label--question  { color: var(--color-accent); }
+    .card__label--answer    { color: var(--color-success); }
+    .card__label--error     { color: var(--color-error); }
+    .card__label--processing { color: var(--color-accent); }
+
+    .card__text {
+      font-size: 14px;
+      line-height: 1.65;
+      color: var(--color-text-primary);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .card__meta {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--color-text-secondary);
+    }
+
+    /* Processing state */
+    .processing-state {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--color-text-secondary);
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--color-card-border);
+      border-top-color: var(--color-accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Input area */
+    .input-area {
+      padding: 14px 24px 18px;
+      border-top: 1px solid var(--color-card-border);
+      background: var(--color-panel-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: 20px;
+      padding: 5px 13px;
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      font-family: var(--font-stack);
+      cursor: pointer;
+      transition: border-color 0.12s, color 0.12s, background 0.12s;
+      white-space: nowrap;
+    }
+
+    .chip:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      background: rgba(232, 98, 42, 0.07);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .query-input {
+      flex: 1;
+      background: var(--color-input-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-md);
+      color: var(--color-text-primary);
+      font-size: 14px;
+      font-family: var(--font-stack);
+      padding: 10px 14px;
+      outline: none;
+      resize: none;
+      min-height: 42px;
+      max-height: 100px;
+      line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+
+    .query-input:focus { border-color: var(--color-accent); }
+
+    .query-input::placeholder { color: var(--color-text-secondary); }
+
+    .btn-submit {
+      background: var(--color-accent);
+      color: var(--color-text-primary);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--font-stack);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+      height: 42px;
+    }
+
+    .btn-submit:hover   { opacity: 0.88; }
+    .btn-submit:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    /* ── RIGHT PANEL ───────────────────────────────────────── */
+    .right-panel {
+      width: 276px;
+      min-width: 276px;
+      background: var(--color-panel-bg);
+      border-left: 1px solid var(--color-card-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .right-panel__header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--color-card-border);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+      flex-shrink: 0;
+    }
+
+    .sources-list {
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-card-border) transparent;
+    }
+
+    .sources-list::-webkit-scrollbar { width: 4px; }
+    .sources-list::-webkit-scrollbar-thumb {
+      background: var(--color-card-border);
+      border-radius: 10px;
+    }
+
+    .source-card {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+
+    .source-card__filename {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 7px;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    .source-card__score-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+
+    .source-card__score-label {
+      font-size: 10px;
+      color: var(--color-text-secondary);
+    }
+
+    .source-card__score-value {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-accent);
+    }
+
+    .relevance-bar {
+      height: 4px;
+      background: var(--color-card-border);
+      border-radius: 4px;
+      margin-bottom: 9px;
+      overflow: hidden;
+    }
+
+    .relevance-fill {
+      height: 100%;
+      background: var(--color-accent);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .source-card__preview {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .sources-empty {
+      padding: 32px 12px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      opacity: 0.5;
+      font-style: italic;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── TOP BAR ────────────────────────────────────────────── -->
+  <header class="top-bar">
+    <div class="top-bar__brand">RAG <span>Knowledge</span> Chatbot</div>
+    <div class="top-bar__divider"></div>
+    <div class="kb-status">
+      <div class="kb-status__dot"></div>
+      Knowledge Base Online
+    </div>
+    <div class="top-bar__spacer"></div>
+    <div class="engine-toggle">
+      <label for="engine-select">AI Engine:</label>
+      <select id="engine-select">
+        <option value="nebius">Nebius — Llama 3.3</option>
+        <option value="bedrock" disabled>AWS Bedrock Claude (Coming Soon)</option>
+      </select>
+    </div>
+    <button class="btn-clear" id="btn-clear">Clear Session</button>
+  </header>
+
+  <!-- ── MAIN LAYOUT ────────────────────────────────────────── -->
+  <div class="main-layout">
+
+    <!-- LEFT SIDEBAR -->
+    <nav class="sidebar">
+      <div class="sidebar__label">Knowledge Base</div>
+      <ul class="doc-list">
+        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Jimmy Hubbard — Resume</li>
+        <li class="doc-list__item"><span class="doc-list__icon">📄</span>NTCIP Traffic Controller Simulator</li>
+        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Live Traffic Dashboard</li>
+        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Log Analyzer</li>
+        <li class="doc-list__item"><span class="doc-list__icon">📄</span>FieldIQ Analytics Platform</li>
+        <li class="doc-list__item"><span class="doc-list__icon">📄</span>AI Resume ↔ Job Matcher</li>
+        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Text to Audio</li>
+      </ul>
+      <hr class="sidebar__sep">
+      <div class="sidebar__session-placeholder">
+        <div class="sidebar__label">Session History</div>
+        <div class="session-placeholder__empty">No previous sessions</div>
+      </div>
+    </nav>
+
+    <!-- CENTER PANEL -->
+    <main class="center-panel">
+      <div class="qa-thread" id="qa-thread">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-state__icon">💬</div>
+          <div class="empty-state__text">Ask a question about Jimmy's work and experience.</div>
+        </div>
+      </div>
+      <div class="input-area">
+        <div class="chip-row" id="chip-row"></div>
+        <div class="input-row">
+          <textarea
+            class="query-input"
+            id="query-input"
+            placeholder="Ask a question about Jimmy's background, projects, or skills..."
+            rows="1"
+          ></textarea>
+          <button class="btn-submit" id="btn-submit">Ask →</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT PANEL -->
+    <aside class="right-panel">
+      <div class="right-panel__header">Retrieved Sources</div>
+      <div class="sources-list" id="sources-list">
+        <div class="sources-empty">Sources will appear here after a query.</div>
+      </div>
+    </aside>
+
+  </div><!-- /.main-layout -->
+
+  <script>
+    // ── CONFIG ────────────────────────────────────────────────
+    const API_ENDPOINT = 'https://uiauqskgv0.execute-api.us-east-1.amazonaws.com/dev/query';
+
+    const SAMPLE_CHIPS = [
+      "What projects has Jimmy built?",
+      "What is the NTCIP Traffic Controller Simulator?",
+      "What AWS services has Jimmy worked with?",
+      "What is FieldIQ?",
+      "How does the Log Analyzer work?",
+      "What is Jimmy's background?",
+      "What certifications does Jimmy have?"
+    ];
+
+    // ── STATE ─────────────────────────────────────────────────
+    let isProcessing = false;
+
+    // ── INIT ──────────────────────────────────────────────────
+    function init() {
+      renderChips();
+      setupHandlers();
+    }
+
+    // ── CHIPS ─────────────────────────────────────────────────
+    function renderChips() {
+      const row = document.getElementById('chip-row');
+      SAMPLE_CHIPS.forEach(text => {
+        const btn = document.createElement('button');
+        btn.className = 'chip';
+        btn.textContent = text;
+        btn.addEventListener('click', () => handleChipClick(text));
+        row.appendChild(btn);
+      });
+    }
+
+    function handleChipClick(text) {
+      if (isProcessing) return;
+      const input = document.getElementById('query-input');
+      input.value = text;
+      autoResize(input);
+      submitQuery(text);
+    }
+
+    // ── INPUT HANDLERS ────────────────────────────────────────
+    function setupHandlers() {
+      const input     = document.getElementById('query-input');
+      const submitBtn = document.getElementById('btn-submit');
+      const clearBtn  = document.getElementById('btn-clear');
+
+      submitBtn.addEventListener('click', () => {
+        const q = input.value.trim();
+        if (q) submitQuery(q);
+      });
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const q = input.value.trim();
+          if (q) submitQuery(q);
+        }
+      });
+
+      input.addEventListener('input', () => autoResize(input));
+      clearBtn.addEventListener('click', clearSession);
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+
+    // ── MAIN QUERY FLOW ───────────────────────────────────────
+    async function submitQuery(question) {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      const input     = document.getElementById('query-input');
+      const submitBtn = document.getElementById('btn-submit');
+      const engine    = getActiveEngine();
+
+      input.value = '';
+      input.style.height = 'auto';
+      submitBtn.disabled = true;
+
+      // Remove empty state on first query
+      const emptyState = document.getElementById('empty-state');
+      if (emptyState) emptyState.remove();
+
+      appendQuestionCard(question);
+      const processingCard = appendProcessingCard();
+
+      await animateProcessingStates(processingCard, engine);
+
+      let data = null;
+      let errorMsg = null;
+      try {
+        data = await callApi(question, engine);
+      } catch (err) {
+        errorMsg = err.message;
+      }
+
+      processingCard.remove();
+
+      if (errorMsg) {
+        appendErrorCard(errorMsg);
+        resetSources();
+      } else {
+        appendAnswerCard(data, engine);
+        renderSources(data.sources || []);
+      }
+
+      submitBtn.disabled = false;
+      isProcessing = false;
+      scrollThreadBottom();
+    }
+
+    // ── PROCESSING ANIMATION ──────────────────────────────────
+    function animateProcessingStates(card, engine) {
+      const engineLabel = engine === 'nebius' ? 'Nebius Llama 3.3' : 'AWS Bedrock Claude';
+      const states = [
+        'Embedding query...',
+        'Searching knowledge base...',
+        `Routing to ${engineLabel}...`,
+        'Generating answer...'
+      ];
+
+      const labelEl = card.querySelector('#processing-label');
+
+      return new Promise(resolve => {
+        let i = 0;
+        function tick() {
+          if (i >= states.length) { resolve(); return; }
+          if (labelEl) labelEl.textContent = states[i];
+          i++;
+          setTimeout(tick, 650);
+        }
+        tick();
+      });
+    }
+
+    // ── API ───────────────────────────────────────────────────
+    async function callApi(query, engine) {
+      let response;
+      try {
+        response = await fetch(API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, selected_engine: engine })
+        });
+      } catch {
+        throw new Error('Network error — could not reach the API. Check your connection.');
+      }
+
+      if (!response.ok) {
+        throw new Error(`API returned HTTP ${response.status} (${response.statusText}).`);
+      }
+
+      let json;
+      try {
+        json = await response.json();
+      } catch {
+        throw new Error('Unexpected response from server — could not parse JSON.');
+      }
+
+      return json;
+    }
+
+    // ── ENGINE ────────────────────────────────────────────────
+    function getActiveEngine() {
+      return document.getElementById('engine-select').value;
+    }
+
+    // ── RENDER: CARDS ─────────────────────────────────────────
+    function appendQuestionCard(text) {
+      const card = document.createElement('div');
+      card.className = 'card card--question';
+      card.innerHTML = `
+        <div class="card__label card__label--question">Your Question</div>
+        <div class="card__text">${escHtml(text)}</div>
+      `;
+      appendToThread(card);
+    }
+
+    function appendProcessingCard() {
+      const card = document.createElement('div');
+      card.className = 'card card--processing';
+      card.innerHTML = `
+        <div class="card__label card__label--processing">Processing</div>
+        <div class="processing-state">
+          <div class="spinner"></div>
+          <span id="processing-label">Embedding query...</span>
+        </div>
+      `;
+      appendToThread(card);
+      return card;
+    }
+
+    function appendAnswerCard(data, engine) {
+      const engineUsed  = data.engine_used || engine;
+      const engineLabel = engineUsed === 'nebius' ? 'Nebius — Llama 3.3' : 'AWS Bedrock Claude';
+      const answerText  = (data.answer || '').trim() || '(No answer returned)';
+
+      const card = document.createElement('div');
+      card.className = 'card card--answer';
+      card.innerHTML = `
+        <div class="card__label card__label--answer">Answer</div>
+        <div class="card__text">${escHtml(answerText)}</div>
+        <div class="card__meta">via ${escHtml(engineLabel)}</div>
+      `;
+      appendToThread(card);
+    }
+
+    function appendErrorCard(message) {
+      const card = document.createElement('div');
+      card.className = 'card card--error';
+      card.innerHTML = `
+        <div class="card__label card__label--error">Error</div>
+        <div class="card__text">${escHtml(message)}</div>
+      `;
+      appendToThread(card);
+    }
+
+    function appendToThread(el) {
+      document.getElementById('qa-thread').appendChild(el);
+      scrollThreadBottom();
+    }
+
+    // ── RENDER: SOURCES ───────────────────────────────────────
+    function renderSources(sources) {
+      const list = document.getElementById('sources-list');
+      list.innerHTML = '';
+
+      if (!sources || sources.length === 0) {
+        list.innerHTML = '<div class="sources-empty">No sources returned for this query.</div>';
+        return;
+      }
+
+      sources.slice(0, 3).forEach(src => {
+        const score    = typeof src.score === 'number' ? src.score : 0;
+        const pct      = Math.round(score * 100);
+        const filename = cleanFilename(src.source_file || 'Unknown source');
+        const rawText  = (src.text || '').trim();
+        const preview  = rawText.length > 200 ? rawText.slice(0, 200) + '…' : rawText;
+
+        const card = document.createElement('div');
+        card.className = 'source-card';
+        card.innerHTML = `
+          <div class="source-card__filename">${escHtml(filename)}</div>
+          <div class="source-card__score-row">
+            <span class="source-card__score-label">Relevance</span>
+            <span class="source-card__score-value">${pct}%</span>
+          </div>
+          <div class="relevance-bar">
+            <div class="relevance-fill" style="width: ${pct}%"></div>
+          </div>
+          <div class="source-card__preview">${escHtml(preview)}</div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function resetSources() {
+      document.getElementById('sources-list').innerHTML =
+        '<div class="sources-empty">Sources will appear here after a query.</div>';
+    }
+
+    // ── CLEAR SESSION ─────────────────────────────────────────
+    function clearSession() {
+      document.getElementById('qa-thread').innerHTML = `
+        <div class="empty-state" id="empty-state">
+          <div class="empty-state__icon">💬</div>
+          <div class="empty-state__text">Ask a question about Jimmy's work and experience.</div>
+        </div>
+      `;
+      resetSources();
+    }
+
+    // ── UTILITIES ─────────────────────────────────────────────
+    function escHtml(str) {
+      const d = document.createElement('div');
+      d.appendChild(document.createTextNode(String(str)));
+      return d.innerHTML;
+    }
+
+    function cleanFilename(name) {
+      return name.replace(/\.(pdf|txt|docx|md)$/i, '').replace(/_/g, ' ').trim();
+    }
+
+    function scrollThreadBottom() {
+      const t = document.getElementById('qa-thread');
+      t.scrollTop = t.scrollHeight;
+    }
+
+    // ── START ─────────────────────────────────────────────────
+    init();
+  </script>
+
+</body>
+</html>
