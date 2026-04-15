@@ -1,0 +1,4 @@
+# No additional dependencies required.
+# boto3 is pre-installed in the Lambda Python 3.12 runtime.
+# urllib is part of the Python standard library.
+# All other imports (json, os, math) are stdlib.

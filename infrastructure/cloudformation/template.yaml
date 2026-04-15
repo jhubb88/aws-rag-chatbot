@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  RAG Chatbot infrastructure — Phase 1.
-  Provisions S3, Lambda execution role, API Gateway, CloudWatch Logs, and CloudTrail.
-  Bedrock permissions are included in the Lambda role but not exercised until Phase 2.
+  RAG Chatbot infrastructure — Phase 3.
+  Adds Query Lambda with multi-provider router (Nebius + Bedrock).
+  API Gateway POST /query wired to QueryLambda (replaces Phase 1 MOCK).
 
 Parameters:
   Environment:
@@ -47,13 +47,11 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          # Public read for frontend
           - Sid: PublicReadFrontend
             Effect: Allow
             Principal: '*'
             Action: s3:GetObject
             Resource: !Sub "${RagChatbotBucket.Arn}/frontend/*"
-          # CloudTrail log delivery
           - Sid: CloudTrailAclCheck
             Effect: Allow
             Principal:
@@ -70,7 +68,7 @@ Resources:
               StringEquals:
                 s3:x-amz-acl: bucket-owner-full-control
 
-  # ── CloudWatch Log Group ─────────────────────────────────────────────────────
+  # ── CloudWatch Log Group (Query Lambda) ──────────────────────────────────────
 
   LambdaLogGroup:
     Type: AWS::Logs::LogGroup
@@ -81,7 +79,10 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
-  # ── Lambda execution role ────────────────────────────────────────────────────
+  # ── Legacy Lambda execution role (Phase 1 placeholder) ───────────────────────
+  # Exported ARN may be referenced externally. QueryLambda uses QueryLambdaRole.
+  # This role is preserved only for export compatibility — do not attach it to
+  # any new Lambda functions.
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -99,14 +100,12 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # CloudWatch Logs
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: !GetAtt LambdaLogGroup.Arn
-              # S3 — documents and embeddings
+                Resource: !Sub "${LambdaLogGroup.Arn}:*"
               - Sid: S3Access
                 Effect: Allow
                 Action:
@@ -116,13 +115,11 @@ Resources:
                 Resource:
                   - !GetAtt RagChatbotBucket.Arn
                   - !Sub "${RagChatbotBucket.Arn}/*"
-              # SSM — Nebius API key
               - Sid: SSMGetParameter
                 Effect: Allow
                 Action:
                   - ssm:GetParameter
                 Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/rag-chatbot/*"
-              # Bedrock — Titan Embeddings (not active until Phase 2)
               - Sid: BedrockEmbeddings
                 Effect: Allow
                 Action:
@@ -134,7 +131,57 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
-  # ── API Gateway ──────────────────────────────────────────────────────────────
+  # ── Query Lambda IAM Role ─────────────────────────────────────────────────────
+
+  QueryLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "rag-chatbot-query-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: QueryLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs — write to the existing query log group
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "${LambdaLogGroup.Arn}:*"
+              # S3 — read vector index only (least-privilege: single key)
+              - Sid: S3ReadIndex
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub "${RagChatbotBucket.Arn}/documents/index.json"
+              # Bedrock — Titan Embeddings v2 (query embedding, live)
+              #           Claude 3 Haiku (generation, blocked pending AWS Support)
+              - Sid: BedrockInvoke
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+              # SSM — Nebius API key
+              - Sid: SSMGetParameter
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/rag-chatbot/*"
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # ── API Gateway ───────────────────────────────────────────────────────────────
 
   RagChatbotApi:
     Type: AWS::ApiGateway::RestApi
@@ -152,29 +199,25 @@ Resources:
       ParentId: !GetAtt RagChatbotApi.RootResourceId
       PathPart: query
 
+  # POST /query — Lambda proxy integration (replaces Phase 1 MOCK)
   QueryMethod:
     Type: AWS::ApiGateway::Method
+    DependsOn: QueryLambda
     Properties:
       RestApiId: !Ref RagChatbotApi
       ResourceId: !Ref QueryResource
       HttpMethod: POST
       AuthorizationType: NONE
       Integration:
-        Type: MOCK
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-        IntegrationResponses:
-          - StatusCode: '200'
-            ResponseTemplates:
-              application/json: '{"message": "Lambda placeholder — Phase 2"}'
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'*'"
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${QueryLambda.Arn}/invocations"
       MethodResponses:
         - StatusCode: '200'
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
 
-  # CORS preflight
+  # OPTIONS /query — CORS preflight, stays MOCK (correct as-is, never reaches Lambda)
   QueryOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -199,11 +242,16 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  ApiDeployment:
+  # Phase 3 deployment — new logical ID forces CloudFormation to create a new
+  # AWS::ApiGateway::Deployment resource on this update. DependsOn ordering alone
+  # does not guarantee redeployment on method changes; a new logical ID does.
+  # Pattern: increment logical ID (ApiDeploymentPhase4, etc.) on future route changes.
+  ApiDeploymentPhase3:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
       - QueryMethod
       - QueryOptionsMethod
+      - QueryLambdaApiGatewayPermission
     Properties:
       RestApiId: !Ref RagChatbotApi
 
@@ -211,14 +259,14 @@ Resources:
     Type: AWS::ApiGateway::Stage
     Properties:
       RestApiId: !Ref RagChatbotApi
-      DeploymentId: !Ref ApiDeployment
+      DeploymentId: !Ref ApiDeploymentPhase3
       StageName: !Ref Environment
       MethodSettings:
         - ResourcePath: "/*"
           HttpMethod: "*"
           MetricsEnabled: true
 
-  # ── Ingest Lambda Log Group ──────────────────────────────────────────────────
+  # ── Ingest Lambda Log Group ───────────────────────────────────────────────────
 
   IngestLambdaLogGroup:
     Type: AWS::Logs::LogGroup
@@ -229,7 +277,7 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
-  # ── Ingest Lambda IAM Role ───────────────────────────────────────────────────
+  # ── Ingest Lambda IAM Role ────────────────────────────────────────────────────
 
   IngestLambdaRole:
     Type: AWS::IAM::Role
@@ -273,15 +321,12 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
-  # ── Ingest Lambda Function ───────────────────────────────────────────────────
-  # PREREQUISITE: lambda/ingest.zip must be uploaded to the S3 bucket BEFORE
-  # running the CloudFormation deploy. The bucket (RagChatbotBucket) already
-  # exists from Phase 1, so this is a packaging step, not a bootstrap problem.
-  # See Step 7 packaging instructions before deploying.
-  #
-  # S3 event notification is NOT wired in CloudFormation due to circular
-  # dependency (bucket <-> Lambda). Use direct invoke or wire manually via
-  # console after deploy if you want automatic trigger on upload.
+  # ── Ingest Lambda Function ────────────────────────────────────────────────────
+  # PREREQUISITE: lambda/ingest.zip must be uploaded to S3 before deploy.
+  # S3 event notification is NOT wired in CloudFormation (circular dependency).
+  # IngestLambdaS3Permission below grants S3 the right to invoke this Lambda,
+  # but bucket notifications must be configured manually via console or CLI —
+  # the permission alone does nothing without that separate wiring step.
 
   IngestLambda:
     Type: AWS::Lambda::Function
@@ -306,8 +351,6 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
-  # Allows S3 to invoke IngestLambda — wire the bucket notification manually
-  # via console or CLI after deploy if you want automatic trigger on upload.
   IngestLambdaS3Permission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -317,7 +360,44 @@ Resources:
       SourceArn: !GetAtt RagChatbotBucket.Arn
       SourceAccount: !Ref AWS::AccountId
 
-  # ── CloudTrail ───────────────────────────────────────────────────────────────
+  # ── Query Lambda Function ─────────────────────────────────────────────────────
+  # PREREQUISITE: lambda/query.zip must be uploaded to S3 before deploy.
+  # See Step 7 packaging instructions.
+
+  QueryLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - LambdaLogGroup
+      - RagChatbotBucket
+    Properties:
+      FunctionName: !Sub "rag-chatbot-query-${Environment}"
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Role: !GetAtt QueryLambdaRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref RagChatbotBucket
+        S3Key: lambda/query.zip
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref RagChatbotBucket
+          NEBIUS_API_KEY_PATH: !Ref NebiusApiKeyPath
+          ENVIRONMENT: !Ref Environment
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # Allows API Gateway to invoke QueryLambda — scoped to POST /query only
+  QueryLambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt QueryLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RagChatbotApi}/*/POST/query"
+
+  # ── CloudTrail ────────────────────────────────────────────────────────────────
 
   RagChatbotTrail:
     Type: AWS::CloudTrail::Trail
@@ -352,11 +432,17 @@ Outputs:
       Name: !Sub "rag-chatbot-api-endpoint-${Environment}"
 
   LambdaRoleArn:
-    Description: Lambda execution role ARN (used in Phase 2)
+    Description: Legacy Lambda execution role ARN (Phase 1 placeholder — preserved for export compatibility)
     Value: !GetAtt LambdaExecutionRole.Arn
     Export:
       Name: !Sub "rag-chatbot-lambda-role-${Environment}"
 
   LogGroupName:
-    Description: Lambda CloudWatch Log Group
+    Description: Query Lambda CloudWatch Log Group
     Value: !Ref LambdaLogGroup
+
+  QueryLambdaArn:
+    Description: Query Lambda ARN
+    Value: !GetAtt QueryLambda.Arn
+    Export:
+      Name: !Sub "rag-chatbot-query-lambda-${Environment}"
