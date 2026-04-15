@@ -1,7 +1,8 @@
 # RAG Knowledge Chatbot — Project Planning Document
-### Multi-Cloud Edition | Last Updated: 2026-04-14
+### Multi-Cloud Edition | Last Updated: 2026-04-15
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 **Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
+**Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
 
 ---
 
@@ -40,7 +41,7 @@ us-east-1 — best Bedrock model availability and lowest latency for demos.
 | API Gateway | Public HTTPS endpoint for query Lambda | Pay-per-request, essentially free at demo scale |
 | Bedrock — Titan Embeddings v2 | Convert text to vectors | AWS-native, instantly approved, no third-party keys |
 | **AWS Bedrock — Claude 3 Haiku** | **Generation Provider A** | Fast, enterprise-grade, requires specific XML prompting |
-| **Nebius AI Studio — Llama 3.1** | **Generation Provider B** | OpenAI-compatible, bypasses AWS auth blocks, uses Markdown prompting |
+| **Nebius AI Studio — Llama 3.3-70B** | **Generation Provider B** | OpenAI-compatible, bypasses AWS auth blocks, uses Markdown prompting |
 | CloudFormation | Infrastructure as code | Recruiter value, prevents drift |
 | CloudWatch | Logging and dashboards | Required for observability |
 | CloudTrail | Audit logging | Shows ops maturity |
@@ -88,7 +89,7 @@ Real 1536-dim vectors confirmed from `amazon.titan-embed-text-v2:0`.
 ### Bedrock Generation (Claude 3 Haiku) — STILL BLOCKED
 AWS account cannot submit Anthropic use case details form.
 Error: "Your account is not authorized to perform this action."
-AWS Support case remains open. Nebius Llama 3.1 is the live generation path until resolved.
+AWS Support case remains open. Nebius Llama 3.3-70B (`meta-llama/Llama-3.3-70B-Instruct`) is the live generation path until resolved.
 
 **Mitigation Plan:**  
 Because the architecture includes Nebius as a dual-provider, Phase 3 (Query Pipeline) is **NOT BLOCKED**. Generation code will be built for both providers; Bedrock path will be live-tested only once AWS Support resolves the account block.
@@ -106,6 +107,21 @@ aws bedrock-runtime invoke-model \
   --region us-east-1 \
   /tmp/bo.json && cat /tmp/bo.json
 ```
+
+### Retrieval Quality — Low Cosine Similarity on Project-List Queries
+Top similarity score for "What projects has Jimmy built?" is 0.2059 — low confidence.
+Project names are not explicitly enumerated in resume chunks, so broad project-list queries
+retrieve resume prose rather than targeted project content.
+
+**Root cause:** Chunk size (500 words) is too large and mixes context; project names are
+buried inside long paragraphs rather than isolated as retrievable units.
+
+**Candidate fixes:**
+- Re-chunk documents with smaller chunk size (e.g. 150-200 words)
+- Add a dedicated project summary index with one entry per project
+
+**Decision:** Defer to Phase 4 tuning or post-MVP. Does not block demo functionality —
+targeted queries (e.g. "What is the NTCIP simulator?") retrieve well.
 
 ### AWS CLI Profile (Recurring Issue)
 `portfolio-user` profile is sometimes lost between WSL sessions. Always verify at session start:
@@ -128,8 +144,8 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 0 | Planning and scaffolding | ✅ Complete |
 | Phase 1 | CloudFormation infrastructure | ✅ Complete — stack live, commit `68a92b6`, tag `v0.2-infra` |
 | Phase 2 | Document ingestion pipeline | ✅ Complete — Lambda deployed, commit `61ee46e`, tag `v0.3-ingest` |
-| Phase 3 | Query pipeline (Router Logic) | ⏳ Next |
-| Phase 4 | Frontend (Dual-Provider UI) | ⏳ Not started |
+| Phase 3 | Query pipeline (Router Logic) | ✅ Complete — query Lambda deployed, commit `c428b22`, tag `v0.4-query` |
+| Phase 4 | Frontend (Dual-Provider UI) | ⏳ Next |
 | Phase 5 | Observability | ⏳ Not started |
 | Phase 6 | Integration testing | ⏳ Not started |
 | Phase 7 | Portfolio polish | ⏳ Not started |
@@ -137,20 +153,27 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 
 ---
 
-## Next Session — Phase 3: Query Pipeline (Router Logic)
+## Next Session — Phase 4: Frontend (Dual-Provider Analyst Console)
 
-1. Write `src/lambdas/query/handler.py`:
-   - Accept POST `{"query": "...", "selected_engine": "bedrock|nebius"}` from API Gateway
-   - Embed the query via Bedrock Titan Embeddings v2
-   - Load `documents/index.json` from S3
-   - Cosine similarity search — return top-K chunks as context
-   - If `bedrock`: invoke Claude 3 Haiku via `boto3` with XML prompt template
-   - If `nebius`: fetch API key from SSM, POST to Nebius AI Studio with Markdown prompt template
-   - Return JSON: `{"answer": "...", "sources": [...], "engine": "..."}`
-2. Wire query Lambda into API Gateway (replace MOCK integration in CloudFormation)
-3. Add query Lambda resources to CloudFormation template
-4. Write `scripts/smoke_test_query.py` for end-to-end validation
-5. Test gate: Nebius path must return a real answer grounded in ingested docs
+1. Build `frontend/index.html` — three-panel analyst console (HTML + CSS + Vanilla JS)
+   - Left sidebar: document list, session history
+   - Top bar: app name, knowledge base status, AI Engine Toggle (Nebius / Bedrock), clear session
+   - Center panel: Q&A thread with processing state animations
+     - States: Embedding query → Searching chunks → Routing to [Provider] → Generating answer
+   - Right panel: retrieved source chunks, citations, relevance scores as percentage + bar
+2. Wire frontend to live API Gateway endpoint
+3. Implement dual-provider toggle — passes `selected_engine` in POST body
+4. Handle `engine_used: "bedrock_blocked"` gracefully in UI
+5. Preloaded sample question chips (from prompt spec):
+   - "What projects has Jimmy built?"
+   - "What is the NTCIP Traffic Controller Simulator?"
+   - "What AWS services has Jimmy worked with?"
+   - "What is FieldIQ?"
+   - "How does the Log Analyzer work?"
+   - "What is Jimmy's background?"
+   - "What certifications does Jimmy have?"
+6. Upload to S3 `frontend/` prefix, confirm CloudFront serves it
+7. Test gate: all 7 sample questions return answers in both Nebius path and Bedrock-blocked path
 
 ---
 
@@ -216,7 +239,7 @@ Three-panel analyst console — not a chatbot, not a form.
 
 - Branch: `main` is always stable
 - Commit format: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
-- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` (next)
+- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` ✅, `v0.5-frontend` (next)
 - Never commit: `.env`, credentials, `data/documents/`
 
 ---
