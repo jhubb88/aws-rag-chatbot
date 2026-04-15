@@ -3,6 +3,7 @@
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 **Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
+**Phase 4 Status:** ✅ Complete — three-panel analyst console deployed to S3, commit `5ca1f31`, tag `v0.5-frontend`
 
 ---
 
@@ -120,8 +121,9 @@ buried inside long paragraphs rather than isolated as retrievable units.
 - Re-chunk documents with smaller chunk size (e.g. 150-200 words)
 - Add a dedicated project summary index with one entry per project
 
-**Decision:** Defer to Phase 4 tuning or post-MVP. Does not block demo functionality —
-targeted queries (e.g. "What is the NTCIP simulator?") retrieve well.
+**Decision:** Immediate next item before Phase 5. Does not block demo functionality —
+targeted queries (e.g. "What is the NTCIP simulator?") retrieve well — but broad
+project-list queries return low-confidence chunks and should be fixed before observability work.
 
 ### AWS CLI Profile (Recurring Issue)
 `portfolio-user` profile is sometimes lost between WSL sessions. Always verify at session start:
@@ -145,35 +147,32 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 1 | CloudFormation infrastructure | ✅ Complete — stack live, commit `68a92b6`, tag `v0.2-infra` |
 | Phase 2 | Document ingestion pipeline | ✅ Complete — Lambda deployed, commit `61ee46e`, tag `v0.3-ingest` |
 | Phase 3 | Query pipeline (Router Logic) | ✅ Complete — query Lambda deployed, commit `c428b22`, tag `v0.4-query` |
-| Phase 4 | Frontend (Dual-Provider UI) | ⏳ Next |
-| Phase 5 | Observability | ⏳ Not started |
+| Phase 4 | Frontend (Dual-Provider UI) | ✅ Complete — analyst console live, commit `5ca1f31`, tag `v0.5-frontend` |
+| Phase 5 | Observability | ⏳ Next |
 | Phase 6 | Integration testing | ⏳ Not started |
 | Phase 7 | Portfolio polish | ⏳ Not started |
 | Phase 8 | Phase 2 features | ⏳ Future |
 
 ---
 
-## Next Session — Phase 4: Frontend (Dual-Provider Analyst Console)
+## Next Session — Retrieval Tuning (Before Phase 5)
 
-1. Build `frontend/index.html` — three-panel analyst console (HTML + CSS + Vanilla JS)
-   - Left sidebar: document list, session history
-   - Top bar: app name, knowledge base status, AI Engine Toggle (Nebius / Bedrock), clear session
-   - Center panel: Q&A thread with processing state animations
-     - States: Embedding query → Searching chunks → Routing to [Provider] → Generating answer
-   - Right panel: retrieved source chunks, citations, relevance scores as percentage + bar
-2. Wire frontend to live API Gateway endpoint
-3. Implement dual-provider toggle — passes `selected_engine` in POST body
-4. Handle `engine_used: "bedrock_blocked"` gracefully in UI
-5. Preloaded sample question chips (from prompt spec):
-   - "What projects has Jimmy built?"
-   - "What is the NTCIP Traffic Controller Simulator?"
-   - "What AWS services has Jimmy worked with?"
-   - "What is FieldIQ?"
-   - "How does the Log Analyzer work?"
-   - "What is Jimmy's background?"
-   - "What certifications does Jimmy have?"
-6. Upload to S3 `frontend/` prefix, confirm CloudFront serves it
-7. Test gate: all 7 sample questions return answers in both Nebius path and Bedrock-blocked path
+Top cosine similarity score is 0.2059 on project-list queries. Fix this before starting observability work.
+
+1. Re-chunk documents with smaller chunk size (target: 150–200 words vs current 500)
+2. Re-embed all chunks via Titan Embeddings v2 and rebuild `documents/index.json` in S3
+3. Run test queries: "What projects has Jimmy built?" — target top score > 0.40
+4. If score remains low: add a dedicated project summary index (one entry per project)
+5. Verify targeted queries (e.g. "What is the NTCIP simulator?") still retrieve correctly
+6. Commit: `chore: retrieval tuning — smaller chunk size and re-embed`
+
+## Phase 5 — Observability (After Retrieval Tuning)
+
+1. CloudWatch dashboard for query Lambda (invocations, errors, p95 latency, estimated cost)
+2. CloudWatch Alarms: error rate > 5%, Lambda duration > 10s
+3. SNS topic for alarm notifications
+4. CloudFront for frontend (HTTPS, prep for custom domain)
+5. Test gate: dashboard visible, alarm fires on synthetic error
 
 ---
 
@@ -239,7 +238,7 @@ Three-panel analyst console — not a chatbot, not a form.
 
 - Branch: `main` is always stable
 - Commit format: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
-- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` ✅, `v0.5-frontend` (next)
+- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` ✅, `v0.5-frontend` ✅
 - Never commit: `.env`, credentials, `data/documents/`
 
 ---
