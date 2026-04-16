@@ -1,9 +1,10 @@
 # RAG Knowledge Chatbot — Project Planning Document
-### Multi-Cloud Edition | Last Updated: 2026-04-15
+### Multi-Cloud Edition | Last Updated: 2026-04-16
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 **Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
 **Phase 4 Status:** ✅ Complete — three-panel analyst console deployed to S3, commit `5ca1f31`, tag `v0.5-frontend`
+**Retrieval Tuning Status:** ✅ Complete — chunk size 500→175 words, curated knowledge files added, all target queries above 0.40, commits `6ae65e2` + `fe98ee9`, tag `v0.6-retrieval-tuning`
 
 ---
 
@@ -87,43 +88,27 @@ CloudFormation included in MVP:
 Titan Embeddings v2 confirmed live. Phase 2 ingest test gate passed end-to-end.
 Real 1536-dim vectors confirmed from `amazon.titan-embed-text-v2:0`.
 
-### Bedrock Generation (Claude 3 Haiku) — STILL BLOCKED
-AWS account cannot submit Anthropic use case details form.
-Error: "Your account is not authorized to perform this action."
-AWS Support case remains open. Nebius Llama 3.3-70B (`meta-llama/Llama-3.3-70B-Instruct`) is the live generation path until resolved.
+### Bedrock Generation (Claude 3 Haiku) — ✅ UNBLOCKED (2026-04-15)
+Anthropic use case form submitted successfully via AWS Console. CLI test confirmed live:
+`invoke-model` returned `"Hello! How can I assist you today?"` via `portfolio-user` profile.
+Both AI providers (Bedrock Claude 3 Haiku + Nebius Llama 3.3-70B) are now fully operational.
 
-**Mitigation Plan:**  
-Because the architecture includes Nebius as a dual-provider, Phase 3 (Query Pipeline) is **NOT BLOCKED**. Generation code will be built for both providers; Bedrock path will be live-tested only once AWS Support resolves the account block.
+### Retrieval Quality — ✅ RESOLVED (2026-04-16)
+Chunk size reduced from 500 to 175 words (overlap 50→20). Four curated knowledge files
+added to `data/curated/` and ingested: `project_index.txt`, `project_summary.txt`,
+`work_history.txt`, `work_history_index.txt`. Total index: 43 chunks.
 
-Test command to verify Bedrock when resolved:
-```bash
-cat > /tmp/bt.json << 'EOF'
-{"anthropic_version":"bedrock-2023-05-31","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}
-EOF
+**Final scores:**
+- "What projects has Jimmy built?" — 0.4179 ✅ (was 0.2059)
+- "What is the NTCIP simulator?" — 0.7268 ✅
+- "What AWS services has Jimmy worked with?" — 0.4590 ✅
+- "Where has Jimmy previously worked?" — 0.4047 ✅
+- "What companies has Jimmy worked for?" — 0.4820 ✅
 
-aws bedrock-runtime invoke-model \
-  --model-id anthropic.claude-3-haiku-20240307-v1:0 \
-  --body fileb:///tmp/bt.json \
-  --profile portfolio-user \
-  --region us-east-1 \
-  /tmp/bo.json && cat /tmp/bo.json
-```
-
-### Retrieval Quality — Low Cosine Similarity on Project-List Queries
-Top similarity score for "What projects has Jimmy built?" is 0.2059 — low confidence.
-Project names are not explicitly enumerated in resume chunks, so broad project-list queries
-retrieve resume prose rather than targeted project content.
-
-**Root cause:** Chunk size (500 words) is too large and mixes context; project names are
-buried inside long paragraphs rather than isolated as retrievable units.
-
-**Candidate fixes:**
-- Re-chunk documents with smaller chunk size (e.g. 150-200 words)
-- Add a dedicated project summary index with one entry per project
-
-**Decision:** Immediate next item before Phase 5. Does not block demo functionality —
-targeted queries (e.g. "What is the NTCIP simulator?") retrieve well — but broad
-project-list queries return low-confidence chunks and should be fixed before observability work.
+**Model migration pending:** Query Lambda uses `anthropic.claude-3-haiku-20240307-v1:0`
+(EOL 2026-09-10). Confirmed replacement: `anthropic.claude-haiku-4-5-20251001-v1:0`.
+TODO comment added in `src/lambdas/query/handler.py`. Do not migrate until Bedrock
+generation is unblocked.
 
 ### AWS CLI Profile (Recurring Issue)
 `portfolio-user` profile is sometimes lost between WSL sessions. Always verify at session start:
@@ -148,23 +133,28 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 2 | Document ingestion pipeline | ✅ Complete — Lambda deployed, commit `61ee46e`, tag `v0.3-ingest` |
 | Phase 3 | Query pipeline (Router Logic) | ✅ Complete — query Lambda deployed, commit `c428b22`, tag `v0.4-query` |
 | Phase 4 | Frontend (Dual-Provider UI) | ✅ Complete — analyst console live, commit `5ca1f31`, tag `v0.5-frontend` |
+| Retrieval Tuning | Pre-Phase 5 quality fix | ✅ Complete — chunk size 175w, 4 curated files, all queries >0.40, tag `v0.6-retrieval-tuning` |
 | Phase 5 | Observability | ⏳ Next |
 | Phase 6 | Integration testing | ⏳ Not started |
-| Phase 7 | Portfolio polish | ⏳ Not started |
+| Phase 7 | Portfolio polish + About modal | ⏳ Not started |
 | Phase 8 | Phase 2 features | ⏳ Future |
 
 ---
 
-## Next Session — Retrieval Tuning (Before Phase 5)
+## Retrieval Tuning — ✅ Complete (2026-04-16)
 
-Top cosine similarity score is 0.2059 on project-list queries. Fix this before starting observability work.
+All target queries now score above 0.40. See Known Issues section for final scores and model migration note.
 
-1. Re-chunk documents with smaller chunk size (target: 150–200 words vs current 500)
-2. Re-embed all chunks via Titan Embeddings v2 and rebuild `documents/index.json` in S3
-3. Run test queries: "What projects has Jimmy built?" — target top score > 0.40
-4. If score remains low: add a dedicated project summary index (one entry per project)
-5. Verify targeted queries (e.g. "What is the NTCIP simulator?") still retrieve correctly
-6. Commit: `chore: retrieval tuning — smaller chunk size and re-embed`
+## Phase 7 — Portfolio Polish
+
+1. **"About This Demo" modal** — triggered by an `ⓘ About This Demo` button at the bottom of the left sidebar, below Session History. Clicking opens a modal overlay (Option B style) with:
+   - **What is RAG?** — plain English explainer (3-4 sentences, non-technical audience)
+   - **How it's built** — bullet list: Titan Embeddings, Lambda cosine search, dual-provider router (Bedrock Claude + Nebius Llama), S3 + API Gateway
+   - Close button (✕) top right of modal
+   - Modal background: `rgba(0,0,0,0.6)` overlay, box `#1A1D24` with `#2E3340` border
+2. Additional polish items TBD at phase start
+
+---
 
 ## Phase 5 — Observability (After Retrieval Tuning)
 
@@ -238,8 +228,9 @@ Three-panel analyst console — not a chatbot, not a form.
 
 - Branch: `main` is always stable
 - Commit format: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
-- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` ✅, `v0.5-frontend` ✅
+- Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` ✅, `v0.5-frontend` ✅, `v0.6-retrieval-tuning` ✅
 - Never commit: `.env`, credentials, `data/documents/`
+- `data/curated/` is NOT gitignored — hand-authored knowledge files live here
 
 ---
 
