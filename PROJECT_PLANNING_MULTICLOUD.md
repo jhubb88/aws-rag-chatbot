@@ -7,6 +7,7 @@
 **Retrieval Tuning Status:** ✅ Complete — chunk size 500→175 words, curated knowledge files added, all target queries above 0.40, commits `6ae65e2` + `fe98ee9`, tag `v0.6-retrieval-tuning`
 **Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS (`https://d1r1qv7io7k8vk.cloudfront.net`), model migration to `us.anthropic.claude-haiku-4-5-20251001-v1:0`, commit `beae846`, tag `v0.7-observability`. Bedrock smoke test PASSED — both providers fully operational.
 **Phase 6 Status:** ✅ Complete — full stack integration tested, all providers passing, commit `d665d53`, tag `v0.8-integration`
+**Phase 7 Status:** ✅ Complete — empty state, top bar subtitle, contrast fix, About modal, commit `2fba0f4`, tag `v0.9-polish`
 
 ---
 
@@ -135,8 +136,9 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Retrieval Tuning | Pre-Phase 5 quality fix | ✅ Complete — chunk size 175w, 4 curated files, all queries >0.40, tag `v0.6-retrieval-tuning` |
 | Phase 5 | Observability | ✅ Complete — CloudWatch dashboard + alarms, SNS, CloudFront, model migration, tag `v0.7-observability` |
 | Phase 6 | Integration testing | ✅ Complete — 9/9 tests passed, F1/F2 fixed, alarm tuned 10s→12s, tag `v0.8-integration` |
-| Phase 7 | Portfolio polish + About modal | ⏳ Not started |
-| Phase 8 | Phase 2 features | ⏳ Future |
+| Phase 7 | Portfolio polish + About modal | ✅ Complete — empty state UX, subtitle, contrast, About modal, tag `v0.9-polish` |
+| Phase 7.5 | Portfolio site card update (lives in portfolio-site repo) | ⏳ Not started |
+| Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | ⏳ Not started |
 
 ---
 
@@ -154,14 +156,106 @@ All 9 test cases passed (11 checks including 7a/7b/7c sub-tests). Two issues fou
 
 ---
 
-## Phase 7 — Portfolio Polish
+## Phase 7 — Portfolio Polish ✅ Complete (2026-04-16) | commit `2fba0f4` | tag `v0.9-polish`
 
-1. **"About This Demo" modal** — triggered by an `ⓘ About This Demo` button at the bottom of the left sidebar, below Session History. Clicking opens a modal overlay (Option B style) with:
-   - **What is RAG?** — plain English explainer (3-4 sentences, non-technical audience)
-   - **How it's built** — bullet list: Titan Embeddings, Lambda cosine search, dual-provider router (Bedrock Claude + Nebius Llama), S3 + API Gateway
-   - Close button (✕) top right of modal
-   - Modal background: `rgba(0,0,0,0.6)` overlay, box `#1A1D24` with `#2E3340` border
-2. Additional polish items TBD at phase start
+- **Item 1 — Empty state:** Replaced blank center panel with headline, subhead naming both providers, and 3 starter prompt cards. Clicking a card auto-submits. Clear Session empties the thread without restoring cards.
+- **Item 2 — Top bar subtitle:** Added "Multi-cloud retrieval · AWS Bedrock + Nebius AI Studio" below the app name in secondary text.
+- **Item 3 — Contrast:** `--color-text-secondary` bumped from `#6B7280` to `#9CA3AF` for WCAG AA compliance on dark background.
+- **Item 4 — About This Demo modal:** Sidebar button opens overlay modal explaining RAG and the full tech stack. Closes on ✕, backdrop click, or Escape. Bug fixed: close listeners use document-level event delegation to avoid script-before-DOM timing issue.
+
+---
+
+## Phase 7.5 — Portfolio Site Card Update (Parking Lot)
+
+**Lives in the `portfolio-site` repo, NOT `aws-rag-chatbot`. Separate commit, separate planning doc if applicable.**
+
+Update the RAG Knowledge Chatbot card on the advanced projects page to match the FieldIQ card exactly:
+- Replace both "COMING SOON" buttons with:
+  - Orange **LIVE DEMO** button → `https://d1r1qv7io7k8vk.cloudfront.net`
+  - Blue **ARCHITECTURE** button → destination TBD (options: GitHub repo README, dedicated architecture page, or About modal anchor inside the demo)
+- Same button styling, spacing, and hover behavior as FieldIQ card
+- No other changes to the card content (title, description stay as-is unless they need a refresh)
+
+Do this AFTER Phase 7 is complete and the demo is fully polished — the LIVE DEMO button should land on the finished version.
+
+---
+
+## Phase 8 — Multi-KB Expansion: AWS Well-Architected Framework
+
+### Why
+The current knowledge base is exclusively about Jimmy. A recruiter exhausts the meaningful questions in 30 seconds, the dual-provider toggle has no reason to be exercised twice, and the strong retrieval scores aren't visibly impressive because the questions are too easy. Adding a second knowledge base — AWS Well-Architected Framework — gives the demo range, gives the dual-provider feature a real reason to exist (technical questions where Claude and Llama phrase answers differently is the most interesting comparison), and turns the retrieval layer into a feature recruiters can actually test.
+
+### Scope
+- Add the AWS Well-Architected Framework as a second knowledge base alongside Jimmy's background
+- Implement cross-KB search (Option B): a single query searches across all KBs at once, results are returned merged with each chunk tagged by its source KB
+- Visually distinguish chunks from different KBs in the right panel (badge + color accent)
+- No KB toggle on/off — it's always-on cross-KB search
+
+### Source Documents
+AWS Well-Architected Framework PDFs (publicly available, free):
+- Framework whitepaper (~80 pages)
+- Six pillar whitepapers: Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization, Sustainability
+- Source: https://aws.amazon.com/architecture/well-architected/
+- Total source: ~500–800 pages of dense technical content
+- Files live in `data/well-architected/` (gitignored, same pattern as `data/documents/`)
+
+### Architecture Decision: Single Combined Index
+All chunks from all KBs go into a single S3 vector index. Each chunk carries a `source_kb` field:
+- `jimmy_background` — existing 43 chunks from `data/documents/` and `data/curated/`
+- `aws_well_architected` — new chunks from `data/well-architected/`
+
+**Why single index over separate-per-KB:**
+- One cosine similarity pass per query — faster, simpler code
+- Merge logic is just sorting by score, no cross-index reconciliation
+- The `source_kb` tag is what enables UI differentiation, not separate indexes
+- If a future KB needs to be removed or refreshed, ingest pipeline filters by `source_kb` field
+
+**Index size impact:** Current 43 chunks → estimated 800–1,200 chunks after Well-Architected ingest. Cosine search across 1,200 1,536-dim vectors in Lambda is still well under 100ms.
+
+### Ingest Pipeline Changes
+- `data/well-architected/` directory created, gitignored
+- Ingest Lambda updated to accept a `source_kb` parameter when processing files
+- Two ingest runs: one for `jimmy_background` (re-ingest existing), one for `aws_well_architected`
+- Combined index written to `s3://rag-chatbot-{account}-dev/index/vector_index.json`
+- Each chunk record includes: `chunk_id`, `text`, `embedding`, `source_doc`, `source_kb`
+
+### Query Pipeline Changes
+- Cosine search returns top-K across the entire combined index, no KB filtering
+- Response includes `source_kb` for each retrieved chunk
+- Generation prompt template (Claude XML and Llama Markdown both) updated to label each chunk with its source KB so the LLM knows when it's blending sources
+
+### Frontend Changes
+- Right panel: each retrieved chunk card shows a KB badge in the top-right corner
+  - "Jimmy" badge — existing accent color (#E8622A orange)
+  - "Well-Architected" badge — new accent color, suggested #4F8AE8 (blue, matches AWS branding) — final color TBD at build
+- Empty state on center panel: replace 3 starter prompts with 6 (3 per KB) to immediately signal that two knowledge bases exist:
+  - Jimmy: existing 3 prompts
+  - Well-Architected: 3 new prompts, suggested:
+    - "What are the six pillars of the Well-Architected Framework?"
+    - "How does AWS recommend handling cost optimization for serverless workloads?"
+    - "What does Well-Architected say about disaster recovery patterns?"
+- Subtitle update: "Multi-cloud retrieval · 2 knowledge bases · AWS Bedrock + Nebius AI Studio"
+- About modal updated: add "Knowledge Bases" section listing the two KBs and their contents
+
+### Retrieval Quality Gate
+After ingest, run cosine score test on representative queries from both KBs. Targets:
+- Jimmy queries: maintain existing scores (>0.40 on all 5 from Retrieval Tuning phase)
+- Well-Architected queries: >0.40 on each of the 3 starter prompts plus 2 random spot-checks
+- If any query drops below threshold, investigate before declaring Phase 8 complete
+
+### Cost Impact
+- One-time ingest cost: ~800 additional chunks × Titan Embeddings v2 pricing ≈ negligible (well under $1)
+- Ongoing query cost: same as current (one embedding per query, one generation call)
+- No new AWS services added
+- $20/mo budget cap unchanged
+
+### What's NOT in Phase 8
+- KB on/off toggle (always-on cross-KB is the demo)
+- Per-KB query routing (one combined index, not multiple)
+- Multi-turn memory / DynamoDB
+- Cognito auth
+- Custom domain
+- Additional KBs beyond Well-Architected (those are Phase 9+)
 
 ---
 
@@ -185,6 +279,8 @@ Source documents to be added to `data/documents/` before Phase 2:
 - Additional project writeups as needed
 
 Note: `data/documents/` is in `.gitignore` — files will never be committed.
+
+**Phase 8 addition:** AWS Well-Architected Framework PDFs to `data/well-architected/` (also gitignored).
 
 ---
 
@@ -215,7 +311,7 @@ Three-panel analyst console — not a chatbot, not a form.
 | Accent | #E8622A (warm orange) |
 | Active/Success | #10B981 (green) |
 | Text Primary | #F9FAFB |
-| Text Secondary | #6B7280 |
+| Text Secondary | #9CA3AF (raised from #6B7280 — WCAG AA compliance) |
 | Font | System font stack |
 | Feel | Premium SaaS product, not a portfolio toy |
 
@@ -239,7 +335,7 @@ Three-panel analyst console — not a chatbot, not a form.
 - Branch: `main` is always stable
 - Commit format: conventional commits (`feat:`, `fix:`, `docs:`, `chore:`)
 - Milestone tags: `v0.1-planning` ✅, `v0.2-infra` ✅, `v0.3-ingest` ✅, `v0.4-query` ✅, `v0.5-frontend` ✅, `v0.6-retrieval-tuning` ✅
-- Never commit: `.env`, credentials, `data/documents/`
+- Never commit: `.env`, credentials, `data/documents/`, `data/well-architected/`
 - `data/curated/` is NOT gitignored — hand-authored knowledge files live here
 
 ---
