@@ -5,7 +5,7 @@
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
 **Phase 4 Status:** ✅ Complete — three-panel analyst console deployed to S3, commit `5ca1f31`, tag `v0.5-frontend`
 **Retrieval Tuning Status:** ✅ Complete — chunk size 500→175 words, curated knowledge files added, all target queries above 0.40, commits `6ae65e2` + `fe98ee9`, tag `v0.6-retrieval-tuning`
-**Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS, model migration to Claude Haiku 4.5, tag `v0.7-observability`
+**Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS (`https://d1r1qv7io7k8vk.cloudfront.net`), model migration to `us.anthropic.claude-haiku-4-5-20251001-v1:0`, commit `beae846`, tag `v0.7-observability`. Bedrock smoke test blocked — AWS marketplace subscription not propagating (open item).
 
 ---
 
@@ -89,10 +89,12 @@ CloudFormation included in MVP:
 Titan Embeddings v2 confirmed live. Phase 2 ingest test gate passed end-to-end.
 Real 1536-dim vectors confirmed from `amazon.titan-embed-text-v2:0`.
 
-### Bedrock Generation (Claude 3 Haiku) — ✅ UNBLOCKED (2026-04-15)
-Anthropic use case form submitted successfully via AWS Console. CLI test confirmed live:
-`invoke-model` returned `"Hello! How can I assist you today?"` via `portfolio-user` profile.
-Both AI providers (Bedrock Claude 3 Haiku + Nebius Llama 3.3-70B) are now fully operational.
+### Bedrock Generation — ⚠️ OPEN ITEM (2026-04-16)
+Model migrated to `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile) during Phase 5.
+Model access approved in Bedrock console. IAM updated with inference profile ARN + marketplace permissions.
+Smoke test still returns `AccessDeniedException` — AWS marketplace subscription not propagating.
+Lambda returns a clean `bedrock_blocked` fallback to the user (not a 500).
+**To retry:** `curl -X POST https://uiauqskgv0.execute-api.us-east-1.amazonaws.com/dev/query -H "Content-Type: application/json" -d '{"query":"What is the NTCIP simulator?","selected_engine":"bedrock"}'` — confirm `engine_used: bedrock`.
 
 ### Retrieval Quality — ✅ RESOLVED (2026-04-16)
 Chunk size reduced from 500 to 175 words (overlap 50→20). Four curated knowledge files
@@ -106,9 +108,7 @@ added to `data/curated/` and ingested: `project_index.txt`, `project_summary.txt
 - "Where has Jimmy previously worked?" — 0.4047 ✅
 - "What companies has Jimmy worked for?" — 0.4820 ✅
 
-**Model migration pending:** Query Lambda uses `anthropic.claude-3-haiku-20240307-v1:0`
-(EOL 2026-09-10). Confirmed replacement: `anthropic.claude-haiku-4-5-20251001-v1:0` (ACTIVE — confirmed via ListFoundationModels).
-TODO comment added in `src/lambdas/query/handler.py`. Migrate during Phase 5.
+**Model migration:** ✅ Complete (Phase 5). Query Lambda uses `us.anthropic.claude-haiku-4-5-20251001-v1:0`.
 
 ### AWS CLI Profile (Recurring Issue)
 `portfolio-user` profile is sometimes lost between WSL sessions. Always verify at session start:
@@ -156,14 +156,14 @@ All target queries now score above 0.40. See Known Issues section for final scor
 
 ---
 
-## Phase 5 — Observability ✅ Complete (2026-04-16)
+## Phase 5 — Observability ✅ Complete (2026-04-16) | commit `beae846` | tag `v0.7-observability`
 
 1. ✅ CloudWatch dashboard `RAG-Chatbot-Dashboard` — 4 widgets: invocations, errors, p95 duration, estimated cost
 2. ✅ CloudWatch Alarms: `rag-chatbot-error-rate-dev` (>5%), `rag-chatbot-p95-duration-dev` (>10s) — both OK
-3. ✅ SNS topic `RAG-Chatbot-Alerts-dev` → jimmy.hubbard0813@gmail.com (pending email confirmation)
-4. ✅ CloudFront distribution `EN88LEBW14923` → `https://d1r1qv7io7k8vk.cloudfront.net` (Deployed)
+3. ✅ SNS topic `RAG-Chatbot-Alerts-dev` → jimmy.hubbard0813@gmail.com — subscription confirmed
+4. ✅ CloudFront distribution `EN88LEBW14923` → `https://d1r1qv7io7k8vk.cloudfront.net` — Deployed, returns 200
 5. ✅ Model migration: query Lambda updated to `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile)
-6. ⏳ Bedrock smoke test deferred — marketplace subscription propagation pending
+6. ⚠️ Bedrock smoke test: OPEN — AWS marketplace subscription not propagating. IAM + model access correct. See Known Issues.
 
 ---
 
