@@ -1,0 +1,39 @@
+Jimmy Hubbard has built seven portfolio projects: the NTCIP Traffic Controller Simulator,
+Live Traffic Dashboard, Log Analyzer, AI Resume Job Matcher, FieldIQ Analytics Platform,
+Text-to-Audio Converter, and a RAG Knowledge Chatbot. These projects demonstrate
+full-stack development, cloud infrastructure on AWS, AI integration, and data
+visualization skills.
+
+Jimmy Hubbard's Portfolio Projects
+
+1. NTCIP Traffic Controller Simulator (TCS) — Browser-based interactive web application
+   for learning signal timing and NTCIP protocol. Technologies: JavaScript, HTML/CSS,
+   WebSockets, hosted on AWS S3 + CloudFront.
+
+2. Live Traffic Dashboard — Real-time traffic data visualization dashboard. Note: live
+   data feed is blocked by CORS so the demo runs on simulated data. Technologies:
+   JavaScript, REST APIs, AWS Lambda, API Gateway, S3, CloudFront.
+
+3. Log Analyzer — Automated log parsing and defect tracking tool. Technologies: Python,
+   AWS Lambda, S3, CloudWatch.
+
+4. AI Resume Job Matcher — AI-powered tool that matches resumes to job descriptions using
+   NLP. Technologies: Python, AWS Lambda, S3, Bedrock.
+
+5. FieldIQ Analytics Platform — Data-heavy college football analytics platform covering
+   all 130+ FBS programs. Surfaces program-level insights including game control metrics,
+   situational analytics, market performance against the spread, long-term program
+   strength, coaching history, draft production, and conference standings. Technologies:
+   JavaScript, AWS S3, CloudFront, REST APIs.
+
+6. Text-to-Audio Converter — Converts written text to audio using AWS Polly. Technologies:
+   Python, AWS Lambda, API Gateway, S3, Polly.
+
+7. RAG Knowledge Chatbot — Serverless retrieval-augmented generation chatbot using Bedrock
+   Titan Embeddings, Nebius Llama 3.3, AWS Lambda, API Gateway, S3, CloudFront.
+
+Jimmy has worked with AWS services including: Lambda, S3, CloudFront, API Gateway,
+Bedrock (Titan Embeddings v2), CloudWatch, IAM, SSM Parameter Store, and CloudFormation.
+
+Jimmy has also used the following AI platforms: Claude, Claude Code, Perplexity, Gemini,
+and Codex.

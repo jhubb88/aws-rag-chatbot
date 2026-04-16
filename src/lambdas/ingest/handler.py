@@ -25,8 +25,8 @@ except ImportError:
 # --- Config (from environment variables set by CloudFormation) ---
 S3_BUCKET = os.environ.get("S3_BUCKET", "rag-chatbot-603509861186-dev")
 EMBED_MODEL = "amazon.titan-embed-text-v2:0"
-CHUNK_SIZE = 500       # tokens (approximated as words)
-CHUNK_OVERLAP = 50     # tokens overlap between chunks
+CHUNK_SIZE = 175       # tokens (approximated as words) — tuned from 500 for better retrieval precision
+CHUNK_OVERLAP = 20     # tokens overlap between chunks
 INDEX_KEY = "documents/index.json"
 
 # --- AWS clients ---

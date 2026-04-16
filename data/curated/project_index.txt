@@ -1,0 +1,4 @@
+Jimmy Hubbard has built the following portfolio projects: the NTCIP Traffic Controller
+Simulator, Live Traffic Dashboard, Log Analyzer, AI Resume Job Matcher, FieldIQ Analytics
+Platform, Text-to-Audio Converter, and a RAG Knowledge Chatbot. Each project is deployed
+on AWS using services such as S3, CloudFront, Lambda, API Gateway, and Bedrock.

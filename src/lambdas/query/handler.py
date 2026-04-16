@@ -28,6 +28,9 @@ from botocore.exceptions import ClientError
 S3_BUCKET = os.environ.get("S3_BUCKET", "rag-chatbot-603509861186-dev")
 INDEX_KEY = "documents/index.json"
 EMBED_MODEL = "amazon.titan-embed-text-v2:0"
+# TODO: MIGRATE MODEL — anthropic.claude-3-haiku-20240307-v1:0 goes EOL 2026-09-10.
+# Confirmed active replacement: anthropic.claude-haiku-4-5-20251001-v1:0
+# Verify model access in Bedrock console before switching.
 HAIKU_MODEL = "anthropic.claude-3-haiku-20240307-v1:0"
 NEBIUS_ENDPOINT = "https://api.studio.nebius.ai/v1/chat/completions"
 NEBIUS_MODEL = "meta-llama/Llama-3.3-70B-Instruct"

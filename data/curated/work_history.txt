@@ -1,0 +1,35 @@
+Jimmy Hubbard has previously worked at Kapsch North America Tolling (2019–2026), where he
+held roles as Staff Engineer and Configuration Engineer. He also served 8 years in the
+United States Air Force as a Civil Engineer (HVAC Technician). His full employment history
+is as follows:
+
+Jimmy Hubbard's Work History
+
+Kapsch North America Tolling (2019 – 2026)
+
+  Staff Engineer (2021 – 2026)
+  Led full lifecycle of multiple projects from design and configuration through
+  commissioning, testing, and operational training. Engineered application and system
+  test procedures for virtualized transportation systems. Administered Linux-based
+  systems and virtual machines using Unix/Linux command-line operations to support
+  DYNAC product testing and troubleshooting.
+  Key responsibilities:
+  - Deployed and maintained 100+ Linux and Windows virtual machines across 7 environments.
+  - Automated repetitive test and deployment workflows using Linux scripts, Java, and Git.
+  - Validated DYNAC software through manual and scripted testing across integrated bridge,
+    tunnel, power, and life safety modules.
+  - Analyzed hundreds of system and server logs to diagnose and resolve application issues.
+  - Translated test results into operator and system training to reduce post-deployment risk.
+
+  Configuration Engineer (2019 – 2021)
+  Assessed system requirements and identified gaps in application specifications. Inspected
+  and electronically tested roadway tolling equipment using test and measurement tools.
+  Key responsibilities:
+  - Led cross-functional installation and configuration of 40+ devices for tolling deployments.
+  - Configured, imaged, and cloned 14+ servers; integrated Sirit and Janus Readers, NVDCs,
+    PDUs, UPSs, and Snap Modules.
+  - Led system activation and acceptance verification for 9+ toll collection and ITS systems.
+  - Diagnosed hardware and software issues across lane control servers, sensors, cameras,
+    RF components, switches, and media converters.
+
+United States Air Force — Civil Engineer (HVAC Technician) | 8 years
