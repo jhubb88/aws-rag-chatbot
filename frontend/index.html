@@ -17,7 +17,7 @@
       --color-top-bar-bg:     #141720;
       --color-input-bg:       #1E2229;
       --color-text-primary:   #F9FAFB;
-      --color-text-secondary: #6B7280;
+      --color-text-secondary: #9CA3AF;
       --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       --radius-sm: 6px;
       --radius-md: 10px;
@@ -58,10 +58,21 @@
       color: var(--color-text-primary);
       letter-spacing: -0.01em;
       white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
     }
 
     .top-bar__brand span {
       color: var(--color-accent);
+    }
+
+    .top-bar__subtitle {
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--color-text-secondary);
+      letter-spacing: 0;
+      white-space: nowrap;
     }
 
     .top-bar__divider {
@@ -244,20 +255,50 @@
       align-items: center;
       justify-content: center;
       flex: 1;
-      gap: 10px;
-      color: var(--color-text-secondary);
-      padding: 60px 0;
+      gap: 20px;
+      padding: 60px 32px;
       text-align: center;
     }
 
-    .empty-state__icon {
-      font-size: 38px;
-      opacity: 0.25;
+    .empty-state__headline {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      max-width: 520px;
+      line-height: 1.4;
     }
 
-    .empty-state__text {
+    .empty-state__subhead {
       font-size: 13px;
-      opacity: 0.55;
+      color: var(--color-text-secondary);
+      max-width: 480px;
+      line-height: 1.5;
+    }
+
+    .empty-state__prompts {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      max-width: 480px;
+      margin-top: 8px;
+    }
+
+    .empty-state__prompt-btn {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      color: var(--color-text-primary);
+      font-size: 13px;
+      font-family: var(--font-stack);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .empty-state__prompt-btn:hover {
+      border-color: var(--color-accent);
     }
 
     /* Cards */
@@ -505,13 +546,127 @@
       font-style: italic;
       line-height: 1.5;
     }
+    /* ── ABOUT MODAL ──────────────────────────────────────── */
+    .about-btn {
+      display: block;
+      width: calc(100% - 32px);
+      margin: 16px auto 0;
+      padding: 8px 12px;
+      background: transparent;
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-text-secondary);
+      font-size: 12px;
+      font-family: var(--font-stack);
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .about-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-text-primary);
+    }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--color-panel-bg);
+      border: 1px solid var(--color-card-border);
+      border-radius: var(--radius-md);
+      max-width: 600px;
+      width: calc(100% - 48px);
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 28px 32px;
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 18px;
+      background: transparent;
+      border: none;
+      color: var(--color-text-secondary);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px 6px;
+    }
+
+    .modal-close:hover {
+      color: var(--color-text-primary);
+    }
+
+    .modal-section {
+      margin-bottom: 24px;
+    }
+
+    .modal-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .modal-section h2 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-accent);
+      margin-bottom: 10px;
+    }
+
+    .modal-section p {
+      font-size: 14px;
+      line-height: 1.65;
+      color: var(--color-text-primary);
+    }
+
+    .modal-section ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .modal-section ul li {
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--color-text-primary);
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .modal-section ul li::before {
+      content: '·';
+      position: absolute;
+      left: 4px;
+      color: var(--color-accent);
+    }
   </style>
 </head>
 <body>
 
   <!-- ── TOP BAR ────────────────────────────────────────────── -->
   <header class="top-bar">
-    <div class="top-bar__brand">RAG <span>Knowledge</span> Chatbot</div>
+    <div class="top-bar__brand">
+      <div>RAG <span>Knowledge</span> Chatbot</div>
+      <div class="top-bar__subtitle">Multi-cloud retrieval · AWS Bedrock + Nebius AI Studio</div>
+    </div>
     <div class="top-bar__divider"></div>
     <div class="kb-status">
       <div class="kb-status__dot"></div>
@@ -548,14 +703,20 @@
         <div class="sidebar__label">Session History</div>
         <div class="session-placeholder__empty">No previous sessions</div>
       </div>
+      <button class="about-btn" id="btn-about">ⓘ About This Demo</button>
     </nav>
 
     <!-- CENTER PANEL -->
     <main class="center-panel">
       <div class="qa-thread" id="qa-thread">
         <div class="empty-state" id="empty-state">
-          <div class="empty-state__icon">💬</div>
-          <div class="empty-state__text">Ask a question about Jimmy's work and experience.</div>
+          <div class="empty-state__headline">Ask anything about Jimmy's projects, AWS work, or technical background</div>
+          <div class="empty-state__subhead">Powered by AWS Bedrock (Claude Haiku 4.5) and Nebius AI Studio (Llama 3.3-70B). Switch engines in the top bar to compare.</div>
+          <div class="empty-state__prompts">
+            <button class="empty-state__prompt-btn">What is the NTCIP simulator?</button>
+            <button class="empty-state__prompt-btn">What AWS services has Jimmy worked with?</button>
+            <button class="empty-state__prompt-btn">What companies has Jimmy worked for?</button>
+          </div>
         </div>
       </div>
       <div class="input-area">
@@ -603,6 +764,17 @@
     function init() {
       renderChips();
       setupHandlers();
+      wireEmptyStatePrompts();
+    }
+
+    // ── EMPTY STATE PROMPTS ───────────────────────────────────
+    function wireEmptyStatePrompts() {
+      document.querySelectorAll('.empty-state__prompt-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('query-input').value = btn.textContent;
+          handleSubmit();
+        });
+      });
     }
 
     // ── CHIPS ─────────────────────────────────────────────────
@@ -850,12 +1022,7 @@
 
     // ── CLEAR SESSION ─────────────────────────────────────────
     function clearSession() {
-      document.getElementById('qa-thread').innerHTML = `
-        <div class="empty-state" id="empty-state">
-          <div class="empty-state__icon">💬</div>
-          <div class="empty-state__text">Ask a question about Jimmy's work and experience.</div>
-        </div>
-      `;
+      document.getElementById('qa-thread').innerHTML = '';
       resetSources();
     }
 
@@ -875,9 +1042,48 @@
       t.scrollTop = t.scrollHeight;
     }
 
+    // ── ABOUT MODAL ───────────────────────────────────────────
+    function openModal() {
+      document.getElementById('modal-about').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-about').classList.remove('open');
+    }
+
+    document.getElementById('btn-about').addEventListener('click', openModal);
+    document.addEventListener('click', e => {
+      if (e.target.id === 'modal-close') closeModal();
+      if (e.target.id === 'modal-about') closeModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+
     // ── START ─────────────────────────────────────────────────
     init();
   </script>
+
+  <!-- ── ABOUT MODAL ───────────────────────────────────────── -->
+  <div class="modal-backdrop" id="modal-about" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-box">
+      <button class="modal-close" id="modal-close" aria-label="Close">✕</button>
+      <div class="modal-section">
+        <h2 id="modal-title">What is RAG?</h2>
+        <p>RAG stands for Retrieval-Augmented Generation. Source documents are split into small chunks and each chunk is converted into a vector — a list of numbers that captures its meaning — using Amazon Titan Embeddings. When you ask a question, the question is embedded the same way, and cosine similarity finds the chunks whose vectors are closest to the question. Those matching chunks are passed to a large language model as context, so the answer is grounded in real source material rather than the model's general training data.</p>
+      </div>
+      <div class="modal-section">
+        <h2>How It's Built</h2>
+        <ul>
+          <li><strong>Embeddings:</strong> Amazon Titan Embeddings v2 — 1536-dimension vectors stored as a JSON index in S3</li>
+          <li><strong>Retrieval:</strong> Cosine similarity search running inside AWS Lambda over the S3 vector index — no managed vector DB</li>
+          <li><strong>Generation:</strong> Dual-provider router — AWS Bedrock (Claude Haiku 4.5) or Nebius AI Studio (Llama 3.3-70B), selectable in real time</li>
+          <li><strong>Infrastructure:</strong> API Gateway, Lambda, S3, CloudFront, CloudFormation IaC</li>
+          <li><strong>Observability:</strong> CloudWatch dashboard, p95 latency + error-rate alarms, SNS alerts</li>
+        </ul>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
