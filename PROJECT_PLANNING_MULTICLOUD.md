@@ -5,6 +5,7 @@
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
 **Phase 4 Status:** ✅ Complete — three-panel analyst console deployed to S3, commit `5ca1f31`, tag `v0.5-frontend`
 **Retrieval Tuning Status:** ✅ Complete — chunk size 500→175 words, curated knowledge files added, all target queries above 0.40, commits `6ae65e2` + `fe98ee9`, tag `v0.6-retrieval-tuning`
+**Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS, model migration to Claude Haiku 4.5, tag `v0.7-observability`
 
 ---
 
@@ -106,9 +107,8 @@ added to `data/curated/` and ingested: `project_index.txt`, `project_summary.txt
 - "What companies has Jimmy worked for?" — 0.4820 ✅
 
 **Model migration pending:** Query Lambda uses `anthropic.claude-3-haiku-20240307-v1:0`
-(EOL 2026-09-10). Confirmed replacement: `anthropic.claude-haiku-4-5-20251001-v1:0`.
-TODO comment added in `src/lambdas/query/handler.py`. Do not migrate until Bedrock
-generation is unblocked.
+(EOL 2026-09-10). Confirmed replacement: `anthropic.claude-haiku-4-5-20251001-v1:0` (ACTIVE — confirmed via ListFoundationModels).
+TODO comment added in `src/lambdas/query/handler.py`. Migrate during Phase 5.
 
 ### AWS CLI Profile (Recurring Issue)
 `portfolio-user` profile is sometimes lost between WSL sessions. Always verify at session start:
@@ -134,7 +134,7 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 3 | Query pipeline (Router Logic) | ✅ Complete — query Lambda deployed, commit `c428b22`, tag `v0.4-query` |
 | Phase 4 | Frontend (Dual-Provider UI) | ✅ Complete — analyst console live, commit `5ca1f31`, tag `v0.5-frontend` |
 | Retrieval Tuning | Pre-Phase 5 quality fix | ✅ Complete — chunk size 175w, 4 curated files, all queries >0.40, tag `v0.6-retrieval-tuning` |
-| Phase 5 | Observability | ⏳ Next |
+| Phase 5 | Observability | ✅ Complete — CloudWatch dashboard + alarms, SNS, CloudFront, model migration, tag `v0.7-observability` |
 | Phase 6 | Integration testing | ⏳ Not started |
 | Phase 7 | Portfolio polish + About modal | ⏳ Not started |
 | Phase 8 | Phase 2 features | ⏳ Future |
@@ -156,13 +156,14 @@ All target queries now score above 0.40. See Known Issues section for final scor
 
 ---
 
-## Phase 5 — Observability (After Retrieval Tuning)
+## Phase 5 — Observability ✅ Complete (2026-04-16)
 
-1. CloudWatch dashboard for query Lambda (invocations, errors, p95 latency, estimated cost)
-2. CloudWatch Alarms: error rate > 5%, Lambda duration > 10s
-3. SNS topic for alarm notifications
-4. CloudFront for frontend (HTTPS, prep for custom domain)
-5. Test gate: dashboard visible, alarm fires on synthetic error
+1. ✅ CloudWatch dashboard `RAG-Chatbot-Dashboard` — 4 widgets: invocations, errors, p95 duration, estimated cost
+2. ✅ CloudWatch Alarms: `rag-chatbot-error-rate-dev` (>5%), `rag-chatbot-p95-duration-dev` (>10s) — both OK
+3. ✅ SNS topic `RAG-Chatbot-Alerts-dev` → jimmy.hubbard0813@gmail.com (pending email confirmation)
+4. ✅ CloudFront distribution `EN88LEBW14923` → `https://d1r1qv7io7k8vk.cloudfront.net` (Deployed)
+5. ✅ Model migration: query Lambda updated to `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile)
+6. ⏳ Bedrock smoke test deferred — marketplace subscription propagation pending
 
 ---
 

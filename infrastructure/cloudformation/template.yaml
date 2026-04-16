@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  RAG Chatbot infrastructure — Phase 3.
-  Adds Query Lambda with multi-provider router (Nebius + Bedrock).
-  API Gateway POST /query wired to QueryLambda (replaces Phase 1 MOCK).
+  RAG Chatbot infrastructure — Phase 5.
+  Adds CloudWatch dashboard, alarms, SNS alert topic, and CloudFront distribution.
+  Updates Query Lambda IAM for Claude Haiku 4.5 cross-region inference profile.
 
 Parameters:
   Environment:
@@ -149,28 +149,42 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # CloudWatch Logs — write to the existing query log group
+              # CloudWatch Logs
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub "${LambdaLogGroup.Arn}:*"
-              # S3 — read vector index only (least-privilege: single key)
+              # S3 — read vector index only
               - Sid: S3ReadIndex
                 Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource: !Sub "${RagChatbotBucket.Arn}/documents/index.json"
-              # Bedrock — Titan Embeddings v2 (query embedding, live)
-              #           Claude 3 Haiku (generation, blocked pending AWS Support)
-              - Sid: BedrockInvoke
+              # Bedrock — Titan Embeddings + legacy Claude 3 Haiku
+              - Sid: BedrockEmbeddings
                 Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                 Resource:
                   - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v2:0"
                   - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+              # Bedrock — Claude Haiku 4.5 cross-region inference profile (Phase 5 migration)
+              - Sid: BedrockHaikuInferenceProfile
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0"
+                  - "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0"
+              # AWS Marketplace — required for Claude Haiku 4.5 subscription verification
+              - Sid: MarketplaceModelAccess
+                Effect: Allow
+                Action:
+                  - aws-marketplace:ViewSubscriptions
+                  - aws-marketplace:Subscribe
+                Resource: "*"
               # SSM — Nebius API key
               - Sid: SSMGetParameter
                 Effect: Allow
@@ -199,7 +213,7 @@ Resources:
       ParentId: !GetAtt RagChatbotApi.RootResourceId
       PathPart: query
 
-  # POST /query — Lambda proxy integration (replaces Phase 1 MOCK)
+  # POST /query — Lambda proxy integration
   QueryMethod:
     Type: AWS::ApiGateway::Method
     DependsOn: QueryLambda
@@ -217,7 +231,7 @@ Resources:
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
 
-  # OPTIONS /query — CORS preflight, stays MOCK (correct as-is, never reaches Lambda)
+  # OPTIONS /query — CORS preflight
   QueryOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -242,10 +256,7 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # Phase 3 deployment — new logical ID forces CloudFormation to create a new
-  # AWS::ApiGateway::Deployment resource on this update. DependsOn ordering alone
-  # does not guarantee redeployment on method changes; a new logical ID does.
-  # Pattern: increment logical ID (ApiDeploymentPhase4, etc.) on future route changes.
+  # New logical ID forces redeployment on method changes.
   ApiDeploymentPhase3:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -322,11 +333,6 @@ Resources:
           Value: rag-chatbot
 
   # ── Ingest Lambda Function ────────────────────────────────────────────────────
-  # PREREQUISITE: lambda/ingest.zip must be uploaded to S3 before deploy.
-  # S3 event notification is NOT wired in CloudFormation (circular dependency).
-  # IngestLambdaS3Permission below grants S3 the right to invoke this Lambda,
-  # but bucket notifications must be configured manually via console or CLI —
-  # the permission alone does nothing without that separate wiring step.
 
   IngestLambda:
     Type: AWS::Lambda::Function
@@ -361,8 +367,6 @@ Resources:
       SourceAccount: !Ref AWS::AccountId
 
   # ── Query Lambda Function ─────────────────────────────────────────────────────
-  # PREREQUISITE: lambda/query.zip must be uploaded to S3 before deploy.
-  # See Step 7 packaging instructions.
 
   QueryLambda:
     Type: AWS::Lambda::Function
@@ -388,7 +392,7 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
-  # Allows API Gateway to invoke QueryLambda — scoped to POST /query only
+  # Allows API Gateway to invoke QueryLambda
   QueryLambdaApiGatewayPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -396,6 +400,186 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RagChatbotApi}/*/POST/query"
+
+  # ── SNS: Alert Topic ──────────────────────────────────────────────────────────
+
+  RagChatbotAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "RAG-Chatbot-Alerts-${Environment}"
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  RagChatbotAlertsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref RagChatbotAlertsTopic
+      Protocol: email
+      Endpoint: jimmy.hubbard0813@gmail.com
+
+  # ── CloudWatch: Alarms ────────────────────────────────────────────────────────
+
+  # Error rate > 5% of invocations over a 5-minute window.
+  # Uses metric math: IF(invocations > 0, errors / invocations * 100, 0)
+  QueryErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "rag-chatbot-error-rate-${Environment}"
+      AlarmDescription: "Query Lambda error rate > 5% of invocations over 5 minutes"
+      Metrics:
+        - Id: errors
+          MetricStat:
+            Metric:
+              Namespace: AWS/Lambda
+              MetricName: Errors
+              Dimensions:
+                - Name: FunctionName
+                  Value: !Ref QueryLambda
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: invocations
+          MetricStat:
+            Metric:
+              Namespace: AWS/Lambda
+              MetricName: Invocations
+              Dimensions:
+                - Name: FunctionName
+                  Value: !Ref QueryLambda
+            Period: 300
+            Stat: Sum
+          ReturnData: false
+        - Id: error_rate
+          Expression: "IF(invocations > 0, errors / invocations * 100, 0)"
+          ReturnData: true
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 5
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref RagChatbotAlertsTopic
+      OKActions:
+        - !Ref RagChatbotAlertsTopic
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # P95 duration > 10 seconds over a 5-minute window.
+  QueryDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "rag-chatbot-p95-duration-${Environment}"
+      AlarmDescription: "Query Lambda p95 duration > 10 seconds"
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref QueryLambda
+      Period: 300
+      ExtendedStatistic: p95
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 10000
+      EvaluationPeriods: 1
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref RagChatbotAlertsTopic
+      OKActions:
+        - !Ref RagChatbotAlertsTopic
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+
+  # ── CloudWatch: Dashboard ─────────────────────────────────────────────────────
+
+  RagChatbotDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: RAG-Chatbot-Dashboard
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Invocations",
+                "metrics": [["AWS/Lambda", "Invocations", "FunctionName", "${QueryLambda}", {"stat": "Sum"}]],
+                "period": 300,
+                "view": "timeSeries",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "Errors",
+                "metrics": [["AWS/Lambda", "Errors", "FunctionName", "${QueryLambda}", {"stat": "Sum", "color": "#d62728"}]],
+                "period": 300,
+                "view": "timeSeries",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "P95 Duration (ms)",
+                "metrics": [["AWS/Lambda", "Duration", "FunctionName", "${QueryLambda}", {"stat": "p95"}]],
+                "period": 300,
+                "view": "timeSeries",
+                "region": "${AWS::Region}"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Estimated Cost USD (approx — 256MB, $0.0000166667/GB-s)",
+                "metrics": [
+                  ["AWS/Lambda", "Duration", "FunctionName", "${QueryLambda}", {"id": "m1", "stat": "Sum", "visible": false}],
+                  [{"expression": "m1 / 1000 * 0.25 * 0.0000166667", "label": "Est. Cost USD", "id": "cost"}]
+                ],
+                "period": 300,
+                "view": "timeSeries",
+                "region": "${AWS::Region}"
+              }
+            }
+          ]
+        }
+
+  # ── CloudFront: Distribution ──────────────────────────────────────────────────
+  # Origin: S3 static website endpoint (HTTP-only — S3 website hosting does not
+  # support HTTPS). CloudFront terminates HTTPS for viewers and redirects HTTP.
+  # Default root object serves frontend/index.html at the distribution root.
+
+  RagChatbotCloudFront:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub "RAG Chatbot frontend — ${Environment}"
+        Enabled: true
+        DefaultRootObject: frontend/index.html
+        Origins:
+          - Id: S3WebsiteOrigin
+            DomainName: !Select [1, !Split ["//", !GetAtt RagChatbotBucket.WebsiteURL]]
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+        PriceClass: PriceClass_100
+        HttpVersion: http2
+      Tags:
+        - Key: Project
+          Value: rag-chatbot
+        - Key: Environment
+          Value: !Ref Environment
 
   # ── CloudTrail ────────────────────────────────────────────────────────────────
 
@@ -446,3 +630,13 @@ Outputs:
     Value: !GetAtt QueryLambda.Arn
     Export:
       Name: !Sub "rag-chatbot-query-lambda-${Environment}"
+
+  AlertsTopicArn:
+    Description: SNS topic ARN for CloudWatch alarm notifications
+    Value: !Ref RagChatbotAlertsTopic
+
+  CloudFrontURL:
+    Description: CloudFront HTTPS URL for the frontend
+    Value: !Sub "https://${RagChatbotCloudFront.DomainName}"
+    Export:
+      Name: !Sub "rag-chatbot-cloudfront-url-${Environment}"

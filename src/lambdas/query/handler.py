@@ -12,8 +12,6 @@ CORS: Every response includes Access-Control-Allow-Origin: '*' so Phase 4 browse
       preflight alone is not sufficient — the actual POST response must also carry
       this header or the browser will block the response body.
 
-Bedrock generation path: code-complete but untestable until AWS Support resolves
-the account-level block on anthropic.claude-3-haiku-20240307-v1:0.
 """
 
 import json
@@ -28,10 +26,7 @@ from botocore.exceptions import ClientError
 S3_BUCKET = os.environ.get("S3_BUCKET", "rag-chatbot-603509861186-dev")
 INDEX_KEY = "documents/index.json"
 EMBED_MODEL = "amazon.titan-embed-text-v2:0"
-# TODO: MIGRATE MODEL — anthropic.claude-3-haiku-20240307-v1:0 goes EOL 2026-09-10.
-# Confirmed active replacement: anthropic.claude-haiku-4-5-20251001-v1:0
-# Verify model access in Bedrock console before switching.
-HAIKU_MODEL = "anthropic.claude-3-haiku-20240307-v1:0"
+HAIKU_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0"  # cross-region inference profile
 NEBIUS_ENDPOINT = "https://api.studio.nebius.ai/v1/chat/completions"
 NEBIUS_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 SSM_KEY_PATH = os.environ.get("NEBIUS_API_KEY_PATH", "/rag-chatbot/nebius-api-key")
@@ -267,19 +262,17 @@ def _get_nebius_api_key():
 
 
 # ---------------------------------------------------------------------------
-# Generation — Bedrock Claude 3 Haiku (code-complete, untestable until AWS Support resolves)
+# Generation — Bedrock Claude Haiku
 # ---------------------------------------------------------------------------
 
 def _generate_bedrock(query, chunks):
     """
-    Call Bedrock Claude 3 Haiku with retrieved chunks as context.
-    NOTE: BLOCKED at the account level — AWS Support case open.
+    Call Bedrock Claude Haiku with retrieved chunks as context.
     On AccessDeniedException: returns a user-readable message with engine_used='bedrock_blocked'
     so the frontend can display a meaningful status rather than a generic 500.
     Returns (answer_text, engine_label) or (None, None) on hard failure.
     """
-    print("[INFO] Generating answer via AWS Bedrock (Claude 3 Haiku)")
-    print("[WARN] Bedrock generation is currently blocked at the account level — AWS Support case open")
+    print("[INFO] Generating answer via AWS Bedrock (Claude Haiku)")
 
     context_block = _format_context(chunks)
 
@@ -315,11 +308,12 @@ def _generate_bedrock(query, chunks):
     except ClientError as e:
         code = e.response["Error"]["Code"]
         if code == "AccessDeniedException":
+            aws_msg = e.response["Error"].get("Message", "(no message)")
+            print(f"[ERROR] Bedrock AccessDeniedException — AWS: {aws_msg}")
             msg = (
-                "Bedrock Claude 3 Haiku is blocked at the AWS account level. "
-                "AWS Support case is open. Please use the Nebius engine for now."
+                "Bedrock Claude Haiku is currently unavailable. "
+                "Please use the Nebius engine."
             )
-            print(f"[ERROR] Bedrock AccessDeniedException: {msg}")
             return msg, "bedrock_blocked"
         print(f"[ERROR] Bedrock ClientError ({code}): {e}")
         return None, None
