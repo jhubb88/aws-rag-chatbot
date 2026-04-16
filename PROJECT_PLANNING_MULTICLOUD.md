@@ -5,7 +5,8 @@
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
 **Phase 4 Status:** ✅ Complete — three-panel analyst console deployed to S3, commit `5ca1f31`, tag `v0.5-frontend`
 **Retrieval Tuning Status:** ✅ Complete — chunk size 500→175 words, curated knowledge files added, all target queries above 0.40, commits `6ae65e2` + `fe98ee9`, tag `v0.6-retrieval-tuning`
-**Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS (`https://d1r1qv7io7k8vk.cloudfront.net`), model migration to `us.anthropic.claude-haiku-4-5-20251001-v1:0`, commit `beae846`, tag `v0.7-observability`. Bedrock smoke test blocked — AWS marketplace subscription not propagating (open item).
+**Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS (`https://d1r1qv7io7k8vk.cloudfront.net`), model migration to `us.anthropic.claude-haiku-4-5-20251001-v1:0`, commit `beae846`, tag `v0.7-observability`. Bedrock smoke test PASSED — both providers fully operational.
+**Phase 6 Status:** ✅ Complete — full stack integration tested, all providers passing, commit `d665d53`, tag `v0.8-integration`
 
 ---
 
@@ -133,7 +134,7 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 4 | Frontend (Dual-Provider UI) | ✅ Complete — analyst console live, commit `5ca1f31`, tag `v0.5-frontend` |
 | Retrieval Tuning | Pre-Phase 5 quality fix | ✅ Complete — chunk size 175w, 4 curated files, all queries >0.40, tag `v0.6-retrieval-tuning` |
 | Phase 5 | Observability | ✅ Complete — CloudWatch dashboard + alarms, SNS, CloudFront, model migration, tag `v0.7-observability` |
-| Phase 6 | Integration testing | ⏳ Not started |
+| Phase 6 | Integration testing | ✅ Complete — 9/9 tests passed, F1/F2 fixed, alarm tuned 10s→12s, tag `v0.8-integration` |
 | Phase 7 | Portfolio polish + About modal | ⏳ Not started |
 | Phase 8 | Phase 2 features | ⏳ Future |
 
@@ -142,6 +143,16 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 ## Retrieval Tuning — ✅ Complete (2026-04-16)
 
 All target queries now score above 0.40. See Known Issues section for final scores and model migration note.
+
+## Phase 6 — Integration Testing ✅ Complete (2026-04-16) | commit `d665d53` | tag `v0.8-integration`
+
+All 9 test cases passed (11 checks including 7a/7b/7c sub-tests). Two issues found and fixed:
+
+- **F1 (CRITICAL):** Bedrock engine dropdown showed "AWS Bedrock Claude (Coming Soon)" with `disabled` attribute. Fixed — now "AWS Bedrock — Claude Haiku 4.5", fully selectable, routes correctly to `selected_engine: bedrock`.
+- **F2 (MINOR):** Missing `favicon.ico` caused HTTP 403 console error on every page load. Fixed with inline SVG data URI `<link rel="icon">` in `<head>` — no S3 upload required.
+- **Alarm tuning:** `rag-chatbot-p95-duration-dev` threshold raised 10,000ms → 12,000ms based on Phase 6 cold start measurement. CloudFormation template updated and redeployed.
+
+---
 
 ## Phase 7 — Portfolio Polish
 
@@ -157,7 +168,7 @@ All target queries now score above 0.40. See Known Issues section for final scor
 ## Phase 5 — Observability ✅ Complete (2026-04-16) | commit `beae846` | tag `v0.7-observability`
 
 1. ✅ CloudWatch dashboard `RAG-Chatbot-Dashboard` — 4 widgets: invocations, errors, p95 duration, estimated cost
-2. ✅ CloudWatch Alarms: `rag-chatbot-error-rate-dev` (>5%), `rag-chatbot-p95-duration-dev` (>10s) — both OK
+2. ✅ CloudWatch Alarms: `rag-chatbot-error-rate-dev` (>5%), `rag-chatbot-p95-duration-dev` (>12s — raised from 10s after Phase 6 cold start measurement: Nebius 4,986ms / Bedrock 4,281ms) — both OK
 3. ✅ SNS topic `RAG-Chatbot-Alerts-dev` → jimmy.hubbard0813@gmail.com — subscription confirmed
 4. ✅ CloudFront distribution `EN88LEBW14923` → `https://d1r1qv7io7k8vk.cloudfront.net` — Deployed, returns 200
 5. ✅ Model migration: query Lambda updated to `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile)
