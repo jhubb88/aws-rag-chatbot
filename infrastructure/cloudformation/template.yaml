@@ -465,12 +465,14 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
-  # P95 duration > 10 seconds over a 5-minute window.
+  # P95 duration > 12 seconds over a 5-minute window.
+  # Threshold raised from 10s to 12s after Phase 6 cold start measurement:
+  # Nebius cold start 4,986ms / Bedrock 4,281ms — 12s gives headroom without masking real issues.
   QueryDurationAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "rag-chatbot-p95-duration-${Environment}"
-      AlarmDescription: "Query Lambda p95 duration > 10 seconds"
+      AlarmDescription: "Query Lambda p95 duration > 12 seconds"
       Namespace: AWS/Lambda
       MetricName: Duration
       Dimensions:
@@ -479,7 +481,7 @@ Resources:
       Period: 300
       ExtendedStatistic: p95
       ComparisonOperator: GreaterThanThreshold
-      Threshold: 10000
+      Threshold: 12000
       EvaluationPeriods: 1
       TreatMissingData: notBreaching
       AlarmActions:
