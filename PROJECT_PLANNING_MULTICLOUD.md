@@ -89,12 +89,10 @@ CloudFormation included in MVP:
 Titan Embeddings v2 confirmed live. Phase 2 ingest test gate passed end-to-end.
 Real 1536-dim vectors confirmed from `amazon.titan-embed-text-v2:0`.
 
-### Bedrock Generation — ⚠️ OPEN ITEM (2026-04-16)
+### Bedrock Generation — ✅ FULLY OPERATIONAL (2026-04-16)
 Model migrated to `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile) during Phase 5.
-Model access approved in Bedrock console. IAM updated with inference profile ARN + marketplace permissions.
-Smoke test still returns `AccessDeniedException` — AWS marketplace subscription not propagating.
-Lambda returns a clean `bedrock_blocked` fallback to the user (not a 500).
-**To retry:** `curl -X POST https://uiauqskgv0.execute-api.us-east-1.amazonaws.com/dev/query -H "Content-Type: application/json" -d '{"query":"What is the NTCIP simulator?","selected_engine":"bedrock"}'` — confirm `engine_used: bedrock`.
+Smoke test confirmed: `engine_used: bedrock` — real answer returned from Claude Haiku 4.5.
+Both AI providers (Bedrock Claude Haiku 4.5 + Nebius Llama 3.3-70B) are now fully operational.
 
 ### Retrieval Quality — ✅ RESOLVED (2026-04-16)
 Chunk size reduced from 500 to 175 words (overlap 50→20). Four curated knowledge files
@@ -163,7 +161,7 @@ All target queries now score above 0.40. See Known Issues section for final scor
 3. ✅ SNS topic `RAG-Chatbot-Alerts-dev` → jimmy.hubbard0813@gmail.com — subscription confirmed
 4. ✅ CloudFront distribution `EN88LEBW14923` → `https://d1r1qv7io7k8vk.cloudfront.net` — Deployed, returns 200
 5. ✅ Model migration: query Lambda updated to `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile)
-6. ⚠️ Bedrock smoke test: OPEN — AWS marketplace subscription not propagating. IAM + model access correct. See Known Issues.
+6. ✅ Bedrock smoke test: PASSED — `engine_used: bedrock` confirmed. Both providers fully operational.
 
 ---
 
