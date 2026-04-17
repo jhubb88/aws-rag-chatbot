@@ -155,7 +155,7 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 5 | Observability | ✅ Complete — CloudWatch dashboard + alarms, SNS, CloudFront, model migration, tag `v0.7-observability` |
 | Phase 6 | Integration testing | ✅ Complete — 9/9 tests passed, F1/F2 fixed, alarm tuned 10s→12s, tag `v0.8-integration` |
 | Phase 7 | Portfolio polish + About modal | ✅ Complete — empty state UX, subtitle, contrast, About modal, tag `v0.9-polish` |
-| Phase 7.5 | Portfolio site card update (lives in portfolio-site repo) | ⏳ Not started |
+| Phase 7.5 | Portfolio site card update (lives in advanced-projects repo) | ✅ Complete — commit `a863579` in advanced-projects |
 | Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | ✅ Complete — commit `f872fc0`, tag `v1.0-multikb` |
 | Phase 8.5 | Mobile responsive layout (iPhone Safari fix) | ✅ Complete — slide-over panels, backdrop dismiss, clear session, placeholder optimization |
 
@@ -184,18 +184,15 @@ All 9 test cases passed (11 checks including 7a/7b/7c sub-tests). Two issues fou
 
 ---
 
-## Phase 7.5 — Portfolio Site Card Update (Parking Lot)
+## Phase 7.5 — Portfolio Site Card Update ✅ Complete (2026-04-17) | commit `a863579` (advanced-projects repo)
 
-**Lives in the `portfolio-site` repo, NOT `aws-rag-chatbot`. Separate commit, separate planning doc if applicable.**
+**Lives in the `advanced-projects` repo, NOT `aws-rag-chatbot`.**
 
-Update the RAG Knowledge Chatbot card on the advanced projects page to match the FieldIQ card exactly:
-- Replace both "COMING SOON" buttons with:
-  - Orange **LIVE DEMO** button → `https://d1r1qv7io7k8vk.cloudfront.net`
-  - Blue **ARCHITECTURE** button → destination TBD (options: GitHub repo README, dedicated architecture page, or About modal anchor inside the demo)
-- Same button styling, spacing, and hover behavior as FieldIQ card
-- No other changes to the card content (title, description stay as-is unless they need a refresh)
+Updated the RAG Knowledge Chatbot card on `https://d2uisqfxjzeo6a.cloudfront.net` to match the FieldIQ card pattern exactly:
+- Orange **LIVE DEMO** button → `https://d1r1qv7io7k8vk.cloudfront.net` (`target="_blank" rel="noopener"`)
+- Blue **ARCHITECTURE** button → opens 6-section RAG architecture modal
 
-Do this AFTER Phase 7 is complete and the demo is fully polished — the LIVE DEMO button should land on the finished version.
+Architecture modal sections: What It Is, Tech Stack, Data Layer, Key Decisions, Structure, What I Learned. Same `modal-overlay` / `modal-panel` structure, close button, backdrop dismiss, and Escape key handling as FieldIQ modal. No shared JS state — RAG modal functions are fully independent (`openRAGModal`, `closeRAGModal`, `handleRAGOverlayClick`, `handleRAGEscKey`).
 
 ---
 
