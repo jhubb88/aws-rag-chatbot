@@ -314,7 +314,9 @@ def _generate_bedrock(query, chunks):
                 "(1) Jimmy Hubbard's background as a systems engineer and software developer, "
                 "and (2) the AWS Well-Architected Framework. "
                 "Use only the provided context. Context chunks are labeled with their "
-                "source knowledge base (jimmy_background or aws_well_architected).\n\n"
+                "source knowledge base (jimmy_background or aws_well_architected). "
+                "Be concise. Answer in 2-3 short paragraphs. Use markdown headers only "
+                "if the question genuinely requires distinct sections.\n\n"
                 f"Context:\n{context_block}\n\n"
                 f"Question: {query}"
             ),
@@ -323,10 +325,10 @@ def _generate_bedrock(query, chunks):
 
     payload = json.dumps({
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 256,
+        "max_tokens": 384,
         "messages": messages,
     })
-    print(f"[DEBUG] Bedrock request: model={HAIKU_MODEL} max_tokens=256")
+    print(f"[DEBUG] Bedrock request: model={HAIKU_MODEL} max_tokens=384")
 
     try:
         response = bedrock.invoke_model(
