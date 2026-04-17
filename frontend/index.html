@@ -726,12 +726,151 @@
       left: 4px;
       color: var(--color-accent);
     }
+
+    /* ── DESKTOP: hide mobile-only controls ───────────────── */
+    .mob-hamburger,
+    .mob-info,
+    .mob-engine-row,
+    .mob-sidebar-clear,
+    .mob-backdrop { display: none; }
+
+    /* ── MOBILE (≤767px) ──────────────────────────────────── */
+    @media (max-width: 767px) {
+
+      body { height: 100dvh; }
+
+      /* Top bar: show hamburger + info, hide desktop controls */
+      .top-bar { padding: 0 10px; gap: 8px; }
+      .top-bar__subtitle,
+      .top-bar__divider,
+      .kb-status,
+      .top-bar__spacer,
+      .engine-toggle,
+      .btn-clear { display: none; }
+      .top-bar__brand { flex: 1; min-width: 0; }
+
+      /* Hamburger / info icon buttons */
+      .mob-hamburger,
+      .mob-info {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--color-text-secondary);
+        flex-shrink: 0;
+        padding: 0;
+        border-radius: var(--radius-sm);
+        transition: color 0.15s;
+      }
+      .mob-hamburger:hover,
+      .mob-info:hover { color: var(--color-text-primary); }
+
+      /* Backdrop overlay */
+      .mob-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 150;
+      }
+      .mob-backdrop.mob-open { display: block; }
+
+      /* Left sidebar: slide-over from left */
+      .sidebar {
+        position: fixed;
+        top: 54px;
+        left: 0;
+        bottom: 0;
+        width: min(80vw, 320px);
+        min-width: unset;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform 250ms ease-out;
+        overflow-y: auto;
+      }
+      .sidebar.mob-open { transform: translateX(0); }
+
+      /* Right panel: slide-over from right */
+      .right-panel {
+        position: fixed;
+        top: 54px;
+        right: 0;
+        bottom: 0;
+        width: min(80vw, 320px);
+        min-width: unset;
+        z-index: 200;
+        transform: translateX(100%);
+        transition: transform 250ms ease-out;
+      }
+      .right-panel.mob-open { transform: translateX(0); }
+
+      /* Center panel: full width, flex column keeps input pinned */
+      .center-panel { width: 100%; }
+      .qa-thread { padding: 16px; }
+
+      /* Input area: sticky bottom (iOS-safe alternative to fixed) */
+      .input-area { position: sticky; bottom: 0; }
+
+      /* Mobile engine row above input */
+      .mob-engine-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--color-text-secondary);
+      }
+      .mob-engine-row label { white-space: nowrap; }
+      .mob-engine-row select {
+        background: var(--color-card-bg);
+        color: var(--color-text-primary);
+        border: 1px solid var(--color-card-border);
+        border-radius: var(--radius-sm);
+        padding: 5px 10px;
+        font-size: 12px;
+        font-family: var(--font-stack);
+        cursor: pointer;
+        outline: none;
+        flex: 1;
+        transition: border-color 0.15s;
+      }
+      .mob-engine-row select:focus { border-color: var(--color-accent); }
+
+      /* Hide chips on mobile (space-constrained) */
+      .chip-row { display: none; }
+
+      /* Empty state: tighter padding */
+      .empty-state { padding: 40px 16px; }
+      .empty-state__prompts { max-width: 100%; }
+
+      /* Cards: tighter padding */
+      .card { padding: 12px 14px; }
+
+      /* Clear session button in sidebar */
+      .mob-sidebar-clear {
+        display: block;
+        margin-top: 8px;
+      }
+
+      /* About modal above mobile overlays */
+      .modal-backdrop { z-index: 300; }
+    }
   </style>
 </head>
 <body>
 
   <!-- ── TOP BAR ────────────────────────────────────────────── -->
   <header class="top-bar">
+    <button class="mob-hamburger" id="mob-hamburger" aria-label="Open sidebar">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <line x1="3" y1="5"  x2="17" y2="5"  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="3" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
     <div class="top-bar__brand">
       <div>RAG <span>Knowledge</span> Chatbot</div>
       <div class="top-bar__subtitle">Multi-cloud retrieval · 2 knowledge bases · AWS Bedrock + Nebius AI Studio</div>
@@ -750,6 +889,13 @@
       </select>
     </div>
     <button class="btn-clear" id="btn-clear">Clear Session</button>
+    <button class="mob-info" id="mob-info" aria-label="View retrieved sources">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="10" y1="9" x2="10" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="10" cy="6.5" r="0.85" fill="currentColor"/>
+      </svg>
+    </button>
   </header>
 
   <!-- ── MAIN LAYOUT ────────────────────────────────────────── -->
@@ -786,6 +932,7 @@
         <div class="session-placeholder__empty">No previous sessions</div>
       </div>
       <button class="about-btn" id="btn-about">ⓘ About This Demo</button>
+      <button class="about-btn mob-sidebar-clear" id="btn-clear-sidebar">Clear Session</button>
     </nav>
 
     <!-- CENTER PANEL -->
@@ -811,6 +958,13 @@
         </div>
       </div>
       <div class="input-area">
+        <div class="mob-engine-row">
+          <label for="mob-engine-select">AI Engine:</label>
+          <select id="mob-engine-select">
+            <option value="bedrock" selected>AWS Bedrock — Claude Haiku 4.5</option>
+            <option value="nebius">Nebius — Llama 3.3</option>
+          </select>
+        </div>
         <div class="chip-row" id="chip-row"></div>
         <div class="input-row">
           <textarea
@@ -855,6 +1009,7 @@
       renderChips();
       setupHandlers();
       wireEmptyStatePrompts();
+      setupMobileOverlays();
     }
 
     // ── EMPTY STATE PROMPTS ───────────────────────────────────
@@ -1139,6 +1294,51 @@
       t.scrollTop = t.scrollHeight;
     }
 
+    // ── MOBILE OVERLAYS ───────────────────────────────────────
+    function setupMobileOverlays() {
+      const hamburger  = document.getElementById('mob-hamburger');
+      const infoBtn    = document.getElementById('mob-info');
+      const backdrop   = document.getElementById('mob-backdrop');
+      const sidebar    = document.querySelector('.sidebar');
+      const rightPanel = document.querySelector('.right-panel');
+      const mobSel     = document.getElementById('mob-engine-select');
+      const deskSel    = document.getElementById('engine-select');
+      const clearSidebar = document.getElementById('btn-clear-sidebar');
+
+      function openSidebar() {
+        sidebar.classList.add('mob-open');
+        backdrop.classList.add('mob-open');
+      }
+      function closeSidebar() {
+        sidebar.classList.remove('mob-open');
+        if (!rightPanel.classList.contains('mob-open')) backdrop.classList.remove('mob-open');
+      }
+      function openRightPanel() {
+        rightPanel.classList.add('mob-open');
+        backdrop.classList.add('mob-open');
+      }
+      function closeRightPanel() {
+        rightPanel.classList.remove('mob-open');
+        if (!sidebar.classList.contains('mob-open')) backdrop.classList.remove('mob-open');
+      }
+      function closeAll() { closeSidebar(); closeRightPanel(); }
+
+      hamburger.addEventListener('click', () =>
+        sidebar.classList.contains('mob-open') ? closeSidebar() : openSidebar());
+
+      infoBtn.addEventListener('click', () =>
+        rightPanel.classList.contains('mob-open') ? closeRightPanel() : openRightPanel());
+
+      backdrop.addEventListener('click', closeAll);
+
+      // Keep engine selects in sync
+      mobSel.addEventListener('change', () => { deskSel.value = mobSel.value; });
+      deskSel.addEventListener('change', () => { mobSel.value = deskSel.value; });
+
+      // Mobile clear session (sidebar)
+      clearSidebar.addEventListener('click', () => { clearSession(); closeAll(); });
+    }
+
     // ── ABOUT MODAL ───────────────────────────────────────────
     function openModal() {
       document.getElementById('modal-about').classList.add('open');
@@ -1160,6 +1360,9 @@
     // ── START ─────────────────────────────────────────────────
     init();
   </script>
+
+  <!-- ── MOBILE BACKDROP ──────────────────────────────────────── -->
+  <div class="mob-backdrop" id="mob-backdrop"></div>
 
   <!-- ── ABOUT MODAL ───────────────────────────────────────── -->
   <div class="modal-backdrop" id="modal-about" role="dialog" aria-modal="true" aria-labelledby="modal-title">
