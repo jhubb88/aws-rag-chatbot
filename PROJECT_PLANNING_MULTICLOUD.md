@@ -403,7 +403,45 @@ Added `[DEBUG] Bedrock request: model=... max_tokens=256` before `invoke_model` 
 | Why should I hire Jimmy? | 197 | end_turn | 8.1s |
 | How do I optimize cost on AWS? | 255 | end_turn | 8.1s |
 
-4/4 end_turn. Zero max_tokens hits at 384. Wall times elevated due to cold containers post-deploy; warm baseline is 3–5s.
+4/4 end_turn. Zero max_tokens hits at 384. Wall times above were cold containers post-deploy.
+
+**Confirmed warm baseline (sequential test after EventBridge warm-up, commit `4768755`):**
+
+| Query | output_tokens | stop_reason | Wall time (warm) |
+|---|---|---|---|
+| Why should I hire Jimmy? | 231 | end_turn | 4.3s |
+| What is the NTCIP simulator? | 275 | end_turn | 4.9s |
+| How do I optimize cost on AWS? | 222 | end_turn | 4.0s |
+| What are the six pillars? | 131 | end_turn | 2.8s |
+
+Bedrock warm baseline: **2.8–4.9s**. Nebius warm baseline: **3–9s** (unchanged from Phase 8). Frontend end-to-end test (8 queries, both providers via CloudFront): all pass, no truncation, no errors.
+
+### Nebius System Prompt Tuning ✅ Complete (2026-04-17) | commit `25d4c7d`
+**Problem:** Post-content-rewrite testing revealed two Nebius answer quality issues: (1) Llama was leading answers with "According to the context" or "Based on the provided information" — a robotic tic that reads poorly in a recruiter-facing demo. (2) Answers closely echoed the source text verbatim rather than synthesizing across chunks.
+
+**Fix — two instructions added to Nebius system prompt:**
+1. *"Never say 'according to the context', 'based on the provided information', or similar phrases — answer directly as if the information is your own knowledge."*
+2. *"Write in your own words and voice, combining facts from multiple context chunks into a flowing answer. Do not structure your answer as bullet points or sectioned lists unless the question genuinely requires them."*
+
+Note: "Do not closely paraphrase the source text" was explicitly rejected — risks Llama dropping specific facts (8 years, Air Force, Staff Engineer level) that feel like direct quotes but are factual grounding we want preserved.
+
+Both providers now have instruction-tuned system prompts. Bedrock tuned for concision and structure (2026-04-17, commit `4768755`); Nebius tuned for natural voice and synthesis (2026-04-17, commit `25d4c7d`).
+
+**Validation (2 queries post-deploy, warm container):**
+
+| Query | completion_tokens | finish_reason | Wall time | Tic present? |
+|---|---|---|---|---|
+| Why should I hire Jimmy? | 113 | stop | 8.3s | No ✅ |
+| What is the NTCIP simulator? | 143 | stop | 4.6s | No ✅ |
+
+"According to the context" tic gone. Both answers read as natural prose. No regression on NTCIP query.
+
+### Curated Content Rewrite Pattern — Phase 9 Candidate
+**Observation:** The "Why hire Jimmy?" section in `data/curated/about_jimmy.txt` was rewritten from a generic two-paragraph summary to a focused 3-sentence pitch. The new text produced immediately better Nebius answers — Nebius echoed the source closely, but the source was now good enough that close echo = good answer.
+
+**Pattern:** Source structure drives answer structure. When Nebius retrieves a well-structured, recruiter-facing chunk, it produces recruiter-facing output without needing synthesis instructions. Prompt tuning helps but content quality is the upstream lever.
+
+**Phase 9 candidate:** Audit remaining `jimmy_background` sections in `data/curated/about_jimmy.txt` using the same pattern — rewrite sections that produce mediocre answers by improving the source text, not just tuning prompts. High-leverage sections to review: "How Jimmy Works With Code and AI Tools", "Role Interests and Career Goals", "Which Project Is Most Impressive".
 
 ### Query Vocabulary Gap
 Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
