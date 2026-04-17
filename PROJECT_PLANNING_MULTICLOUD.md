@@ -384,8 +384,8 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 3. **Nebius Fast tier** — Higher per-token cost but faster streaming. Reduces Nebius generation wall time.
 4. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
 
-### Bedrock Completion Tokens Logging Symmetry
-Nebius path logs `completion_tokens` and `finish_reason` via the permanent usage log. Bedrock path has no equivalent — CloudWatch shows Lambda duration but not token usage. Add a usage log to `_generate_bedrock` mirroring the Nebius pattern for consistent observability across both providers.
+### Bedrock Completion Tokens Logging Symmetry ✅ Complete (2026-04-17) | commit `92fc076`
+Added `[DEBUG] Bedrock request: model=... max_tokens=256` before `invoke_model` and `[INFO] Bedrock usage: input_tokens=N output_tokens=N stop_reason=X` after response parse. Uses Bedrock-native field names (`input_tokens` / `output_tokens` / `stop_reason`) matching Anthropic's response shape. Confirmed in CloudWatch: `input_tokens=926 output_tokens=255 stop_reason=end_turn` on first post-deploy query.
 
 ### Query Vocabulary Gap
 Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
