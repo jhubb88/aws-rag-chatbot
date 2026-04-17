@@ -405,6 +405,18 @@ All 8 steps complete. See Phase 8 Progress and Phase 8 Performance Fix subsectio
 
 ---
 
+## Post-v1.0 Bug Fixes (2026-04-17)
+
+Two silent frontend bugs found and fixed after v1.0 shipped. No new phase number — these are follow-up polish.
+
+### Fix 1 — Center starter prompts threw silent ReferenceError (commit `e14b447`)
+`wireEmptyStatePrompts()` called `handleSubmit()` which was never defined. Result: tapping a center prompt filled the input field but the query never fired and the empty-state DOM was never removed. User had to press Ask manually (two-tap flow). The bottom pill row called `submitQuery()` directly and worked correctly — one-tap flow. Fixed by replacing `handleSubmit()` with `submitQuery(btn.textContent)` plus `isProcessing` guard and `autoResize()` call, matching the chip handler exactly. Bug was present since Phase 7.
+
+### Fix 2 — Clear Session mid-flight left `isProcessing` stuck true (commit `04e88d6`)
+`clearSession()` reset the DOM but did not reset `isProcessing` or abort the in-flight fetch. Any chip or starter prompt tap during the ~2.6s animation + fetch window was silently dropped by `if (isProcessing) return`. Tapping Clear then tapping a new prompt appeared to do nothing for 3–4 taps until the original fetch resolved. Fixed with AbortController pattern: `submitQuery()` creates a controller per call and passes `signal` to `fetch()`; `AbortError` is caught and returns silently. `clearSession()` calls `abort()`, sets `isProcessing = false`, re-enables the submit button, and nulls the controller reference before restoring the DOM.
+
+---
+
 ## Phase 5 — Observability ✅ Complete (2026-04-16) | commit `beae846` | tag `v0.7-observability`
 
 1. ✅ CloudWatch dashboard `RAG-Chatbot-Dashboard` — 4 widgets: invocations, errors, p95 duration, estimated cost
