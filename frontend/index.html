@@ -776,6 +776,7 @@
         inset: 0;
         background: rgba(0, 0, 0, 0.5);
         z-index: 150;
+        cursor: pointer;
       }
       .mob-backdrop.mob-open { display: block; }
 
@@ -812,8 +813,7 @@
       .center-panel { width: 100%; }
       .qa-thread { padding: 16px; }
 
-      /* Input area: sticky bottom (iOS-safe alternative to fixed) */
-      .input-area { position: sticky; bottom: 0; }
+      /* Input area: flex layout pins it naturally; no override needed */
 
       /* Mobile engine row above input */
       .mob-engine-row {
@@ -842,9 +842,10 @@
       /* Hide chips on mobile (space-constrained) */
       .chip-row { display: none; }
 
-      /* Empty state: tighter padding */
-      .empty-state { padding: 40px 16px; }
+      /* Empty state: tighter padding, top-aligned so portrait viewports don't clip */
+      .empty-state { padding: 40px 16px; justify-content: flex-start; }
       .empty-state__prompts { max-width: 100%; }
+      .qa-thread { min-height: 0; }
 
       /* Cards: tighter padding */
       .card { padding: 12px 14px; }
@@ -970,7 +971,7 @@
           <textarea
             class="query-input"
             id="query-input"
-            placeholder="Ask a question about Jimmy's background, projects, or skills..."
+            placeholder=""
             rows="1"
           ></textarea>
           <button class="btn-submit" id="btn-submit">Ask →</button>
@@ -988,6 +989,9 @@
 
   </div><!-- /.main-layout -->
 
+  <!-- ── MOBILE BACKDROP ──────────────────────────────────────── -->
+  <div class="mob-backdrop" id="mob-backdrop"></div>
+
   <script>
     // ── CONFIG ────────────────────────────────────────────────
     const API_ENDPOINT = 'https://uiauqskgv0.execute-api.us-east-1.amazonaws.com/dev/query';
@@ -1003,13 +1007,17 @@
 
     // ── STATE ─────────────────────────────────────────────────
     let isProcessing = false;
+    let _emptyStateHTML = '';
 
     // ── INIT ──────────────────────────────────────────────────
     function init() {
+      _emptyStateHTML = document.getElementById('empty-state').outerHTML;
       renderChips();
       setupHandlers();
       wireEmptyStatePrompts();
       setupMobileOverlays();
+      updatePlaceholder();
+      window.addEventListener('resize', updatePlaceholder);
     }
 
     // ── EMPTY STATE PROMPTS ───────────────────────────────────
@@ -1068,6 +1076,13 @@
     function autoResize(el) {
       el.style.height = 'auto';
       el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+
+    // ── PLACEHOLDER SWAP ──────────────────────────────────────
+    function updatePlaceholder() {
+      document.getElementById('query-input').placeholder = window.innerWidth <= 767
+        ? 'Ask about Jimmy or AWS...'
+        : 'Ask a question about Jimmy\u2019s background, projects, or skills...';
     }
 
     // ── MAIN QUERY FLOW ───────────────────────────────────────
@@ -1274,7 +1289,8 @@
 
     // ── CLEAR SESSION ─────────────────────────────────────────
     function clearSession() {
-      document.getElementById('qa-thread').innerHTML = '';
+      document.getElementById('qa-thread').innerHTML = _emptyStateHTML;
+      wireEmptyStatePrompts();
       resetSources();
     }
 
@@ -1360,9 +1376,6 @@
     // ── START ─────────────────────────────────────────────────
     init();
   </script>
-
-  <!-- ── MOBILE BACKDROP ──────────────────────────────────────── -->
-  <div class="mob-backdrop" id="mob-backdrop"></div>
 
   <!-- ── ABOUT MODAL ───────────────────────────────────────── -->
   <div class="modal-backdrop" id="modal-about" role="dialog" aria-modal="true" aria-labelledby="modal-title">

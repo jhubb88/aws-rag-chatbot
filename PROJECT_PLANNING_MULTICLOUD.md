@@ -9,6 +9,7 @@
 **Phase 6 Status:** ✅ Complete — full stack integration tested, all providers passing, commit `d665d53`, tag `v0.8-integration`
 **Phase 7 Status:** ✅ Complete — empty state, top bar subtitle, contrast fix, About modal, commit `2fba0f4`, tag `v0.9-polish`
 **Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `f872fc0`, tag `v1.0-multikb`
+**Phase 8.5 Status:** ✅ Complete — mobile responsive layout, iPhone Safari bugs resolved, commit TBD (no new tag — v1.0-multikb stands)
 
 ---
 
@@ -130,6 +131,9 @@ Cold worst-case dropped from 32,279ms → 14,860ms (~54%). Warm queries now 5–
 ### Query Vocabulary Gap (Deferred — Phase 9)
 Open-ended recruiter queries like "what should I look at first" score below the 0.40 retrieval threshold because the curated content uses comparative vocabulary (impressive, flagship, best) rather than entry-point vocabulary (start with, first thing). The right fix is query rewriting at the query Lambda layer, not additional content patches. Candidate for Phase 9.
 
+### Horizontal Scroll on Mobile — Phase 8.6 / Phase 9 Candidate
+iPhone Safari shows horizontal page scroll when swiping left/right. Root cause: an element overflowing viewport width. Does not affect functionality — queries, overlays, and session clear all work. Not blocking demo use. Fix: identify overflowing element with `overflow-x: hidden` on body or targeted containment. Log here for Phase 8.6 or Phase 9 attention.
+
 ### GitHub Auth (Recurring Issue)
 `gh` CLI requires a classic PAT (`ghp_`) with `repo` and `read:org` scopes. If repo creation fails, re-authenticate:
 ```bash
@@ -153,6 +157,7 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 7 | Portfolio polish + About modal | ✅ Complete — empty state UX, subtitle, contrast, About modal, tag `v0.9-polish` |
 | Phase 7.5 | Portfolio site card update (lives in portfolio-site repo) | ⏳ Not started |
 | Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | ✅ Complete — commit `f872fc0`, tag `v1.0-multikb` |
+| Phase 8.5 | Mobile responsive layout (iPhone Safari fix) | ✅ Complete — slide-over panels, backdrop dismiss, clear session, placeholder optimization |
 
 ---
 
@@ -345,6 +350,31 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 - Query Lambda deployed with warmup branch + max_tokens=256 + index caching
 - Frontend deployed to S3 + CloudFront invalidation `I27FTAYSL2YZ7ICI07W5TGD70V`
 - Smoke test: CloudFront 200, bedrock selected in served HTML, both providers returning real answers with correct KB routing
+
+---
+
+## Phase 8.5 — Mobile Responsive Layout ✅ Complete (2026-04-17)
+
+**Why:** The three-panel desktop layout was broken on iPhone Safari — center panel invisible, panels overlapping, text clipped. Added a `@media (max-width: 767px)` breakpoint with slide-over overlays for sidebar and right panel, matching the Claude.ai panel pattern.
+
+**What shipped:**
+- `body` uses `100dvh` for accurate iOS viewport height
+- Sidebar + right panel become `position: fixed` slide-overs (`transform: translateX`), toggled by hamburger and info buttons in the top bar
+- `mob-backdrop` div (z-index 150) dims content and dismisses overlays on tap
+- Mobile engine dropdown in `.input-area` (bidirectionally synced with desktop dropdown)
+- "Clear Session" button in sidebar for mobile
+- Placeholder swap: JS swaps textarea placeholder at load + resize (≤767px: "Ask about Jimmy or AWS...", >767px: full desktop text)
+
+**Bugs found and fixed across iterations:**
+
+| Bug | Root cause | Fix |
+|---|---|---|
+| Backdrop tap ignored on iOS | `mob-backdrop` div was defined AFTER `</script>` — `getElementById` returned null at setup, `backdrop.addEventListener` never ran | Moved `mob-backdrop` div to before `<script>` tag |
+| Mobile "Clear Session" did nothing | Same null throw caused `clearSidebar.addEventListener` to never execute (it came after the throw in `setupMobileOverlays`) | Fixed by moving backdrop element; `clearSession()` also updated to restore empty state HTML + re-wire prompt buttons |
+| Portrait scroll hid input area | `position: sticky; bottom: 0` on `.input-area` inside a non-scrolling flex column → iOS Safari quirk | Removed sticky override; flex layout already pins input at the bottom |
+| Input placeholder clipped on load | Long placeholder wrapped to two lines inside a 42px single-row textarea | JS placeholder swap at load + resize |
+
+**Files changed:** `frontend/index.html` only.
 
 ---
 
