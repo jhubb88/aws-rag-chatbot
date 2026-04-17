@@ -1008,6 +1008,7 @@
     // ── STATE ─────────────────────────────────────────────────
     let isProcessing = false;
     let _emptyStateHTML = '';
+    let currentAbortController = null;
 
     // ── INIT ──────────────────────────────────────────────────
     function init() {
@@ -1093,6 +1094,10 @@
       if (isProcessing) return;
       isProcessing = true;
 
+      if (currentAbortController) currentAbortController.abort();
+      const controller = new AbortController();
+      currentAbortController = controller;
+
       const input     = document.getElementById('query-input');
       const submitBtn = document.getElementById('btn-submit');
       const engine    = getActiveEngine();
@@ -1113,8 +1118,9 @@
       let data = null;
       let errorMsg = null;
       try {
-        data = await callApi(question, engine);
+        data = await callApi(question, engine, controller.signal);
       } catch (err) {
+        if (err.name === 'AbortError') return;
         errorMsg = err.message;
       }
 
@@ -1130,6 +1136,7 @@
 
       submitBtn.disabled = false;
       isProcessing = false;
+      currentAbortController = null;
       scrollThreadBottom();
     }
 
@@ -1158,15 +1165,17 @@
     }
 
     // ── API ───────────────────────────────────────────────────
-    async function callApi(query, engine) {
+    async function callApi(query, engine, signal) {
       let response;
       try {
         response = await fetch(API_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, selected_engine: engine })
+          body: JSON.stringify({ query, selected_engine: engine }),
+          signal
         });
-      } catch {
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
         throw new Error('Network error — could not reach the API. Check your connection.');
       }
 
@@ -1292,6 +1301,12 @@
 
     // ── CLEAR SESSION ─────────────────────────────────────────
     function clearSession() {
+      if (currentAbortController) {
+        currentAbortController.abort();
+        currentAbortController = null;
+      }
+      isProcessing = false;
+      document.getElementById('btn-submit').disabled = false;
       document.getElementById('qa-thread').innerHTML = _emptyStateHTML;
       wireEmptyStatePrompts();
       resetSources();
