@@ -326,6 +326,7 @@ def _generate_bedrock(query, chunks):
         "max_tokens": 256,
         "messages": messages,
     })
+    print(f"[DEBUG] Bedrock request: model={HAIKU_MODEL} max_tokens=256")
 
     try:
         response = bedrock.invoke_model(
@@ -336,6 +337,9 @@ def _generate_bedrock(query, chunks):
         )
         result = json.loads(response["body"].read())
         answer = result["content"][0]["text"].strip()
+        usage = result.get("usage", {})
+        stop_reason = result.get("stop_reason")
+        print(f"[INFO] Bedrock usage: input_tokens={usage.get('input_tokens')} output_tokens={usage.get('output_tokens')} stop_reason={stop_reason}")
         print(f"[INFO] Bedrock generation successful ({len(answer)} chars)")
         return answer, "bedrock"
     except ClientError as e:
