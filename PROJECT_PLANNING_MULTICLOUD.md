@@ -8,7 +8,7 @@
 **Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS (`https://d1r1qv7io7k8vk.cloudfront.net`), model migration to `us.anthropic.claude-haiku-4-5-20251001-v1:0`, commit `beae846`, tag `v0.7-observability`. Bedrock smoke test PASSED — both providers fully operational.
 **Phase 6 Status:** ✅ Complete — full stack integration tested, all providers passing, commit `d665d53`, tag `v0.8-integration`
 **Phase 7 Status:** ✅ Complete — empty state, top bar subtitle, contrast fix, About modal, commit `2fba0f4`, tag `v0.9-polish`
-**Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `TBD`, tag `v1.0-multikb`
+**Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `f872fc0`, tag `v1.0-multikb`
 
 ---
 
@@ -152,7 +152,7 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 6 | Integration testing | ✅ Complete — 9/9 tests passed, F1/F2 fixed, alarm tuned 10s→12s, tag `v0.8-integration` |
 | Phase 7 | Portfolio polish + About modal | ✅ Complete — empty state UX, subtitle, contrast, About modal, tag `v0.9-polish` |
 | Phase 7.5 | Portfolio site card update (lives in portfolio-site repo) | ⏳ Not started |
-| Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | ✅ Complete — commit `TBD`, tag `v1.0-multikb` |
+| Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | ✅ Complete — commit `f872fc0`, tag `v1.0-multikb` |
 
 ---
 
