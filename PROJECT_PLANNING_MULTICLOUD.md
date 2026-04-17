@@ -9,7 +9,7 @@
 **Phase 6 Status:** ✅ Complete — full stack integration tested, all providers passing, commit `d665d53`, tag `v0.8-integration`
 **Phase 7 Status:** ✅ Complete — empty state, top bar subtitle, contrast fix, About modal, commit `2fba0f4`, tag `v0.9-polish`
 **Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `f872fc0`, tag `v1.0-multikb`
-**Phase 8.5 Status:** ✅ Complete — mobile responsive layout, iPhone Safari bugs resolved, commit TBD (no new tag — v1.0-multikb stands)
+**Phase 8.5 Status:** ✅ Complete — mobile responsive layout, iPhone Safari bugs resolved, commit `ba601b5` (no new tag — v1.0-multikb stands)
 
 ---
 
@@ -353,7 +353,7 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 
 ---
 
-## Phase 8.5 — Mobile Responsive Layout ✅ Complete (2026-04-17)
+## Phase 8.5 — Mobile Responsive Layout ✅ Complete (2026-04-17) | commit `ba601b5`
 
 **Why:** The three-panel desktop layout was broken on iPhone Safari — center panel invisible, panels overlapping, text clipped. Added a `@media (max-width: 767px)` breakpoint with slide-over overlays for sidebar and right panel, matching the Claude.ai panel pattern.
 
