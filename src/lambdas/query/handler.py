@@ -227,7 +227,13 @@ def _generate_nebius(query, chunks):
         "Use only the provided context to answer questions. Context chunks are labeled "
         "with their source knowledge base (jimmy_background or aws_well_architected). "
         "If the context does not contain enough information to answer the question, "
-        "say so clearly. Be concise and accurate."
+        "say so clearly. "
+        "Never say 'according to the context', 'based on the provided information', "
+        "or similar phrases — answer directly as if the information is your own knowledge. "
+        "Write in your own words and voice, combining facts from multiple context chunks "
+        "into a flowing answer. Do not structure your answer as bullet points or sectioned "
+        "lists unless the question genuinely requires them. "
+        "Be concise and accurate."
     )
 
     user_prompt = (
