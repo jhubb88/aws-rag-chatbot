@@ -197,9 +197,34 @@
     }
 
     .doc-list__icon {
-      font-size: 12px;
+      display: inline-block;
+      width: 12px;
+      height: 14px;
       flex-shrink: 0;
       opacity: 0.6;
+    }
+
+    .doc-list__icon::before {
+      content: '';
+      display: block;
+      width: 12px;
+      height: 14px;
+      background-repeat: no-repeat;
+      background-size: contain;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='14' viewBox='0 0 12 14'%3E%3Cpath d='M1 0.5 L8 0.5 L11.5 4 L11.5 13.5 L1 13.5 Z' fill='none' stroke='%239CA3AF' stroke-width='1.2' stroke-linejoin='round'/%3E%3Cpath d='M8 0.5 L8 4 L11.5 4' fill='none' stroke='%239CA3AF' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+
+    .sidebar__kb-scroll {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--color-card-border) transparent;
+    }
+
+    .sidebar__kb-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar__kb-scroll::-webkit-scrollbar-thumb {
+      background: var(--color-card-border);
+      border-radius: 10px;
     }
 
     .sidebar__sep {
@@ -299,6 +324,23 @@
 
     .empty-state__prompt-btn:hover {
       border-color: var(--color-accent);
+    }
+
+    .empty-state__prompt-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .empty-state__prompt-group-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+      padding: 0 2px;
+      margin-top: 4px;
     }
 
     /* Cards */
@@ -546,6 +588,33 @@
       font-style: italic;
       line-height: 1.5;
     }
+
+    .source-card__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 7px;
+    }
+
+    .source-card__header .source-card__filename {
+      margin-bottom: 0;
+    }
+
+    .kb-badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .kb-badge--jimmy { background: rgba(232,98,42,0.18); color: #E8622A; }
+    .kb-badge--wa    { background: rgba(79,138,232,0.18); color: #4F8AE8; }
+
     /* ── ABOUT MODAL ──────────────────────────────────────── */
     .about-btn {
       display: block;
@@ -665,12 +734,12 @@
   <header class="top-bar">
     <div class="top-bar__brand">
       <div>RAG <span>Knowledge</span> Chatbot</div>
-      <div class="top-bar__subtitle">Multi-cloud retrieval · AWS Bedrock + Nebius AI Studio</div>
+      <div class="top-bar__subtitle">Multi-cloud retrieval · 2 knowledge bases · AWS Bedrock + Nebius AI Studio</div>
     </div>
     <div class="top-bar__divider"></div>
     <div class="kb-status">
       <div class="kb-status__dot"></div>
-      Knowledge Base Online
+      Knowledge Bases Online
     </div>
     <div class="top-bar__spacer"></div>
     <div class="engine-toggle">
@@ -688,16 +757,29 @@
 
     <!-- LEFT SIDEBAR -->
     <nav class="sidebar">
-      <div class="sidebar__label">Knowledge Base</div>
-      <ul class="doc-list">
-        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Jimmy Hubbard — Resume</li>
-        <li class="doc-list__item"><span class="doc-list__icon">📄</span>NTCIP Traffic Controller Simulator</li>
-        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Live Traffic Dashboard</li>
-        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Log Analyzer</li>
-        <li class="doc-list__item"><span class="doc-list__icon">📄</span>FieldIQ Analytics Platform</li>
-        <li class="doc-list__item"><span class="doc-list__icon">📄</span>AI Resume ↔ Job Matcher</li>
-        <li class="doc-list__item"><span class="doc-list__icon">📄</span>Text to Audio</li>
-      </ul>
+      <div class="sidebar__kb-scroll">
+        <div class="sidebar__label">Jimmy's Background</div>
+        <ul class="doc-list">
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Resume</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>About Jimmy</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>NTCIP Traffic Controller Simulator</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Live Traffic Dashboard</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Log Analyzer</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>FieldIQ Analytics Platform</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>AI Resume ↔ Job Matcher</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Text to Audio</li>
+        </ul>
+        <hr class="sidebar__sep">
+        <div class="sidebar__label">AWS Well-Architected</div>
+        <ul class="doc-list">
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Operational Excellence</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Security</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Reliability</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Performance Efficiency</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Cost Optimization</li>
+          <li class="doc-list__item"><span class="doc-list__icon"></span>Sustainability</li>
+        </ul>
+      </div>
       <hr class="sidebar__sep">
       <div class="sidebar__session-placeholder">
         <div class="sidebar__label">Session History</div>
@@ -713,9 +795,18 @@
           <div class="empty-state__headline">Ask anything about Jimmy's projects, AWS work, or technical background</div>
           <div class="empty-state__subhead">Powered by AWS Bedrock (Claude Haiku 4.5) and Nebius AI Studio (Llama 3.3-70B). Switch engines in the top bar to compare.</div>
           <div class="empty-state__prompts">
-            <button class="empty-state__prompt-btn">What is the NTCIP simulator?</button>
-            <button class="empty-state__prompt-btn">What AWS services has Jimmy worked with?</button>
-            <button class="empty-state__prompt-btn">What companies has Jimmy worked for?</button>
+            <div class="empty-state__prompt-group">
+              <div class="empty-state__prompt-group-label">Jimmy's Background</div>
+              <button class="empty-state__prompt-btn">What is the NTCIP simulator?</button>
+              <button class="empty-state__prompt-btn">What AWS services has Jimmy worked with?</button>
+              <button class="empty-state__prompt-btn">What companies has Jimmy worked for?</button>
+            </div>
+            <div class="empty-state__prompt-group">
+              <div class="empty-state__prompt-group-label">AWS Well-Architected</div>
+              <button class="empty-state__prompt-btn">What are the six pillars of the Well-Architected Framework?</button>
+              <button class="empty-state__prompt-btn">How does AWS recommend handling cost optimization for serverless workloads?</button>
+              <button class="empty-state__prompt-btn">What does Well-Architected say about disaster recovery patterns?</button>
+            </div>
           </div>
         </div>
       </div>
@@ -749,12 +840,11 @@
 
     const SAMPLE_CHIPS = [
       "What projects has Jimmy built?",
-      "What is the NTCIP Traffic Controller Simulator?",
-      "What AWS services has Jimmy worked with?",
-      "What is FieldIQ?",
-      "How does the Log Analyzer work?",
-      "What is Jimmy's background?",
-      "What certifications does Jimmy have?"
+      "What's Jimmy's AWS experience?",
+      "Why should I hire Jimmy?",
+      "What are the six pillars?",
+      "How do I optimize cost on AWS?",
+      "What is operational excellence?",
     ];
 
     // ── STATE ─────────────────────────────────────────────────
@@ -997,11 +1087,18 @@
         const filename = cleanFilename(src.source_file || 'Unknown source');
         const rawText  = (src.text || '').trim();
         const preview  = rawText.length > 200 ? rawText.slice(0, 200) + '…' : rawText;
+        const sourceKb = src.source_kb || '';
+        const kbClass  = sourceKb === 'jimmy_background' ? 'jimmy' : 'wa';
+        const kbLabel  = sourceKb === 'jimmy_background' ? 'Jimmy' : 'Well-Architected';
+        const kbBadge  = sourceKb ? `<span class="kb-badge kb-badge--${kbClass}">${kbLabel}</span>` : '';
 
         const card = document.createElement('div');
         card.className = 'source-card';
         card.innerHTML = `
-          <div class="source-card__filename">${escHtml(filename)}</div>
+          <div class="source-card__header">
+            <div class="source-card__filename">${escHtml(filename)}</div>
+            ${kbBadge}
+          </div>
           <div class="source-card__score-row">
             <span class="source-card__score-label">Relevance</span>
             <span class="source-card__score-value">${pct}%</span>
@@ -1071,6 +1168,13 @@
       <div class="modal-section">
         <h2 id="modal-title">What is RAG?</h2>
         <p>RAG stands for Retrieval-Augmented Generation. Source documents are split into small chunks and each chunk is converted into a vector — a list of numbers that captures its meaning — using Amazon Titan Embeddings. When you ask a question, the question is embedded the same way, and cosine similarity finds the chunks whose vectors are closest to the question. Those matching chunks are passed to a large language model as context, so the answer is grounded in real source material rather than the model's general training data.</p>
+      </div>
+      <div class="modal-section">
+        <h2>Knowledge Bases</h2>
+        <ul>
+          <li><strong>Jimmy's Background</strong> — Resume, project writeups, work history, and curated Q&amp;A covering Jimmy Hubbard's professional background, skills, and portfolio projects.</li>
+          <li><strong>AWS Well-Architected Framework</strong> — The six pillar whitepapers from AWS: Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization, and Sustainability.</li>
+        </ul>
       </div>
       <div class="modal-section">
         <h2>How It's Built</h2>

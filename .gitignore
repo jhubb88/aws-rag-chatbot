@@ -6,3 +6,4 @@ node_modules/
 venv/
 *.zip
 data/documents/
+data/well-architected/

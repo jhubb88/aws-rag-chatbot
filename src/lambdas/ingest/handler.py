@@ -13,6 +13,7 @@ Lambda execution: uses the IngestLambda IAM execution role (no profile needed).
 import json
 import os
 import boto3
+from rag_utils import chunk_text, embed_text
 
 # Optional: pypdf for PDF support
 try:
@@ -43,6 +44,7 @@ def lambda_handler(event, context):
     print(f"[INFO] Event: {json.dumps(event)}")
 
     filenames = _extract_filenames(event)
+    source_kb = event.get("source_kb", "jimmy_background")
     if not filenames:
         print("[WARN] No filenames found in event — nothing to ingest")
         return {"statusCode": 200, "body": "No files to ingest"}
@@ -71,20 +73,21 @@ def lambda_handler(event, context):
             chunk_counter = len(existing_index)
 
         # Chunk the text
-        chunks = _chunk_text(text, CHUNK_SIZE, CHUNK_OVERLAP)
+        chunks = chunk_text(text, CHUNK_SIZE, CHUNK_OVERLAP)
         print(f"[INFO] {filename} split into {len(chunks)} chunks")
 
         # Embed each chunk
-        for chunk_text in chunks:
-            embedding = _embed_text(chunk_text)
+        for chunk_val in chunks:
+            embedding = embed_text(bedrock, chunk_val, EMBED_MODEL)
             if embedding is None:
                 print(f"[WARN] Skipping chunk from {filename} — embedding failed")
                 continue
             entry = {
                 "chunk_id": chunk_counter,
-                "text": chunk_text,
+                "text": chunk_val,
                 "embedding": embedding,
                 "source_file": filename,
+                "source_kb": source_kb,
             }
             new_entries.append(entry)
             chunk_counter += 1
@@ -123,7 +126,6 @@ def _extract_filenames(event):
         for record in event["Records"]:
             try:
                 key = record["s3"]["object"]["key"]
-                # Strip the documents/ prefix to get just the filename
                 filename = key.split("/")[-1]
                 if filename:
                     filenames.append(filename)
@@ -170,48 +172,6 @@ def _read_document_from_s3(s3_key, filename):
 
     else:
         print(f"[WARN] Unsupported file type: {filename} (ext={ext}) — skipping")
-        return None
-
-
-def _chunk_text(text, chunk_size, overlap):
-    """
-    Split text into chunks of approximately chunk_size words with overlap.
-    Words are used as a proxy for tokens (approx 0.75 tokens/word average).
-    """
-    words = text.split()
-    if not words:
-        return []
-
-    chunks = []
-    start = 0
-    while start < len(words):
-        end = min(start + chunk_size, len(words))
-        chunk = " ".join(words[start:end])
-        chunks.append(chunk)
-        if end == len(words):
-            break
-        start += chunk_size - overlap
-
-    return chunks
-
-
-def _embed_text(text):
-    """
-    Call Bedrock Titan Embeddings v2 to embed a single text chunk.
-    Returns the embedding vector (list of floats), or None on failure.
-    """
-    payload = json.dumps({"inputText": text})
-    try:
-        response = bedrock.invoke_model(
-            modelId=EMBED_MODEL,
-            body=payload,
-            contentType="application/json",
-            accept="application/json",
-        )
-        result = json.loads(response["body"].read())
-        return result["embedding"]
-    except Exception as e:
-        print(f"[ERROR] Bedrock embedding failed: {e}")
         return None
 
 

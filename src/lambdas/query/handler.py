@@ -38,6 +38,9 @@ s3 = boto3.client("s3", region_name="us-east-1")
 bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
 ssm = boto3.client("ssm", region_name="us-east-1")
 
+# --- Module-level cache — populated on first invocation, reused on warm containers ---
+_index_cache = None
+
 
 def lambda_handler(event, context):
     """Entry point for the Query Lambda."""
@@ -98,6 +101,7 @@ def lambda_handler(event, context):
         {
             "text": chunk["text"],
             "source_file": chunk["source_file"],
+            "source_kb": chunk["source_kb"],
             "score": round(chunk["score"], 4),
         }
         for chunk in top_chunks
@@ -134,12 +138,19 @@ def _embed_query(text):
 
 
 def _load_index():
-    """Load vector index from S3. Returns list of chunk dicts or None on hard failure."""
+    """Load vector index from S3. Returns list of chunk dicts or None on hard failure.
+    On warm containers the module-level _index_cache is returned directly, skipping S3.
+    """
+    global _index_cache
+    if _index_cache is not None:
+        print(f"[INFO] Using cached vector index: {len(_index_cache)} chunks")
+        return _index_cache
     try:
         response = s3.get_object(Bucket=S3_BUCKET, Key=INDEX_KEY)
         data = json.loads(response["Body"].read())
-        print(f"[INFO] Loaded vector index: {len(data)} chunks")
-        return data
+        print(f"[INFO] Loaded vector index from S3: {len(data)} chunks")
+        _index_cache = data
+        return _index_cache
     except s3.exceptions.NoSuchKey:
         print(f"[ERROR] Index not found at s3://{S3_BUCKET}/{INDEX_KEY} — run ingest first")
         return None
@@ -172,6 +183,7 @@ def _retrieve_top_k(query_embedding, index, k=3):
                 "chunk_id": entry.get("chunk_id"),
                 "text": entry["text"],
                 "source_file": entry["source_file"],
+                "source_kb": entry.get("source_kb", "unknown"),
                 "score": score,
             })
         except Exception as e:
@@ -199,10 +211,13 @@ def _generate_nebius(query, chunks):
     context_block = _format_context(chunks)
 
     system_prompt = (
-        "You are a helpful assistant that answers questions about Jimmy Hubbard, "
-        "a systems engineer and software developer. Use only the provided context to "
-        "answer questions. If the context does not contain enough information to answer "
-        "the question, say so clearly. Be concise and accurate."
+        "You are a helpful assistant with access to two knowledge bases: "
+        "(1) Jimmy Hubbard's background as a systems engineer and software developer, "
+        "and (2) the AWS Well-Architected Framework. "
+        "Use only the provided context to answer questions. Context chunks are labeled "
+        "with their source knowledge base (jimmy_background or aws_well_architected). "
+        "If the context does not contain enough information to answer the question, "
+        "say so clearly. Be concise and accurate."
     )
 
     user_prompt = (
@@ -211,15 +226,17 @@ def _generate_nebius(query, chunks):
         "Answer based on the context above:"
     )
 
-    payload = json.dumps({
+    payload_dict = {
         "model": NEBIUS_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "max_tokens": 512,
+        "max_tokens": 256,
         "temperature": 0.3,
-    }).encode("utf-8")
+    }
+    print(f"[DEBUG] Nebius request body: {json.dumps({k: v for k, v in payload_dict.items() if k != 'messages'})}")
+    payload = json.dumps(payload_dict).encode("utf-8")
 
     req = urllib.request.Request(
         NEBIUS_ENDPOINT,
@@ -235,6 +252,9 @@ def _generate_nebius(query, chunks):
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read())
         answer = result["choices"][0]["message"]["content"].strip()
+        usage = result.get("usage", {})
+        finish = result["choices"][0].get("finish_reason")
+        print(f"[INFO] Nebius usage: prompt_tokens={usage.get('prompt_tokens')} completion_tokens={usage.get('completion_tokens')} finish_reason={finish}")
         print(f"[INFO] Nebius generation successful ({len(answer)} chars)")
         return answer, "nebius"
     except urllib.error.HTTPError as e:
@@ -280,8 +300,11 @@ def _generate_bedrock(query, chunks):
         {
             "role": "user",
             "content": (
-                "You are a helpful assistant that answers questions about Jimmy Hubbard, "
-                "a systems engineer and software developer. Use only the provided context.\n\n"
+                "You are a helpful assistant with access to two knowledge bases: "
+                "(1) Jimmy Hubbard's background as a systems engineer and software developer, "
+                "and (2) the AWS Well-Architected Framework. "
+                "Use only the provided context. Context chunks are labeled with their "
+                "source knowledge base (jimmy_background or aws_well_architected).\n\n"
                 f"Context:\n{context_block}\n\n"
                 f"Question: {query}"
             ),
@@ -290,7 +313,7 @@ def _generate_bedrock(query, chunks):
 
     payload = json.dumps({
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 512,
+        "max_tokens": 256,
         "messages": messages,
     })
 
@@ -336,7 +359,7 @@ def _format_context(chunks):
         text = chunk["text"]
         if len(text) > CHUNK_CHAR_CAP:
             text = text[:CHUNK_CHAR_CAP] + "…"
-        lines.append(f"[{i}] (source: {chunk['source_file']}, score: {chunk['score']:.4f})")
+        lines.append(f"[{i}] (source: {chunk['source_file']}, kb: {chunk['source_kb']}, score: {chunk['score']:.4f})")
         lines.append(text)
         lines.append("")
     return "\n".join(lines)

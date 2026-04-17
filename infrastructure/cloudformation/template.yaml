@@ -379,7 +379,7 @@ Resources:
       Handler: handler.lambda_handler
       Role: !GetAtt QueryLambdaRole.Arn
       Timeout: 60
-      MemorySize: 256
+      MemorySize: 1024
       Code:
         S3Bucket: !Ref RagChatbotBucket
         S3Key: lambda/query.zip

@@ -8,6 +8,7 @@
 **Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS (`https://d1r1qv7io7k8vk.cloudfront.net`), model migration to `us.anthropic.claude-haiku-4-5-20251001-v1:0`, commit `beae846`, tag `v0.7-observability`. Bedrock smoke test PASSED — both providers fully operational.
 **Phase 6 Status:** ✅ Complete — full stack integration tested, all providers passing, commit `d665d53`, tag `v0.8-integration`
 **Phase 7 Status:** ✅ Complete — empty state, top bar subtitle, contrast fix, About modal, commit `2fba0f4`, tag `v0.9-polish`
+**Phase 8 Status:** 🔄 In Progress — Steps 1–6 complete, Step 7 (performance gate) pending, Step 8 (commit/tag/push) pending
 
 ---
 
@@ -116,6 +117,19 @@ added to `data/curated/` and ingested: `project_index.txt`, `project_summary.txt
 aws configure list --profile portfolio-user
 ```
 
+### WA Query Latency — ⚠️ MITIGATED (2026-04-17)
+Phase 8 WA queries were hitting the API Gateway 29s hard timeout due to: 256MB Lambda memory (insufficient CPU for 58MB index), no index caching, and max_tokens=512 allowing verbose Nebius responses. Three fixes applied:
+- QueryLambda MemorySize 256MB → 1024MB (CloudFormation + direct update)
+- Module-level index caching in query Lambda (warm containers skip S3 load)
+- max_tokens 512 → 256 on both Nebius and Bedrock paths (matched, enforced — confirmed via Nebius `completion_tokens` usage log)
+
+Cold worst-case dropped from 32,279ms → 14,860ms (~54%). Warm queries now 5–8s. All queries pass under 29s limit.
+
+**Not fully resolved:** 19–20s warm on some verbose queries is still high for portfolio demo quality. Step 7 performance gate will decide whether to ship as-is or invest in parked levers (see Phase 9 Candidates).
+
+### Query Vocabulary Gap (Deferred — Phase 9)
+Open-ended recruiter queries like "what should I look at first" score below the 0.40 retrieval threshold because the curated content uses comparative vocabulary (impressive, flagship, best) rather than entry-point vocabulary (start with, first thing). The right fix is query rewriting at the query Lambda layer, not additional content patches. Candidate for Phase 9.
+
 ### GitHub Auth (Recurring Issue)
 `gh` CLI requires a classic PAT (`ghp_`) with `repo` and `read:org` scopes. If repo creation fails, re-authenticate:
 ```bash
@@ -138,7 +152,7 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 6 | Integration testing | ✅ Complete — 9/9 tests passed, F1/F2 fixed, alarm tuned 10s→12s, tag `v0.8-integration` |
 | Phase 7 | Portfolio polish + About modal | ✅ Complete — empty state UX, subtitle, contrast, About modal, tag `v0.9-polish` |
 | Phase 7.5 | Portfolio site card update (lives in portfolio-site repo) | ⏳ Not started |
-| Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | ⏳ Not started |
+| Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | 🔄 In Progress — Steps 1–6 ✅, Step 7 (perf gate) ⏳, Step 8 (commit/tag) ⏳ |
 
 ---
 
@@ -216,7 +230,7 @@ All chunks from all KBs go into a single S3 vector index. Each chunk carries a `
 - `data/well-architected/` directory created, gitignored
 - Ingest Lambda updated to accept a `source_kb` parameter when processing files
 - Two ingest runs: one for `jimmy_background` (re-ingest existing), one for `aws_well_architected`
-- Combined index written to `s3://rag-chatbot-{account}-dev/index/vector_index.json`
+- Combined index written to `s3://rag-chatbot-{account}-dev/documents/index.json`
 - Each chunk record includes: `chunk_id`, `text`, `embedding`, `source_doc`, `source_kb`
 
 ### Query Pipeline Changes
@@ -256,6 +270,74 @@ After ingest, run cosine score test on representative queries from both KBs. Tar
 - Cognito auth
 - Custom domain
 - Additional KBs beyond Well-Architected (those are Phase 9+)
+
+### Phase 8 Progress
+
+**Steps 1–4 — Ingest pipeline + source_kb tagging**
+- Ingest Lambda and `rag_utils.py` shared library updated to accept and stamp `source_kb` on every chunk
+- `scripts/ingest_bulk.py` added as permanent repo tool for corpus loads exceeding Lambda's 15-min ceiling
+- `scripts/migrate_index_add_source_kb.py` ran once to tag all 43 original Jimmy chunks as `jimmy_background`
+- 1,974 Well-Architected chunks ingested from 6 pillar PDFs (`framework.pdf` removed — umbrella doc duplicating pillar content); curated files `about_jimmy.txt` and `highlight_index.txt` added and ingested
+- Total index: **2,027 chunks** (1,974 WA + 43 Jimmy background + 10 curated) at `documents/index.json` (~58MB)
+
+**Step 5 — Frontend**
+- Sidebar restructured into 2 KB groups (JIMMY'S BACKGROUND / AWS WELL-ARCHITECTED); SVG document icons via CSS `::before`; `.sidebar__kb-scroll` with `overflow-y: auto`
+- Empty state: 6 grouped prompts (3 per KB) replacing original 3
+- Top bar subtitle updated to "Multi-cloud retrieval · 2 knowledge bases · AWS Bedrock + Nebius AI Studio"
+- Top bar status updated to "Knowledge Bases Online" (plural)
+- KB badges deployed on source cards: orange `#E8622A` for Jimmy, blue `#4F8AE8` for Well-Architected
+- About modal updated with Knowledge Bases section
+- Bottom pill bar refreshed: 6 mixed-KB chips
+
+**Step 6 — Retrieval quality gate: ✅ 10/10 PASS**
+
+| Query | KB | Top Score |
+|---|---|---|
+| Why should I hire Jimmy? | jimmy_background | 0.5968 |
+| What technologies does Jimmy know? | jimmy_background | 0.5870 |
+| What is Jimmy's work experience? | jimmy_background | 0.6660 |
+| What projects has Jimmy built? | jimmy_background | 0.4857 |
+| What makes Jimmy a strong candidate? | jimmy_background | 0.5577 |
+| What are the six pillars? | aws_well_architected | 0.8188 |
+| How do I optimize cost on AWS? | aws_well_architected | 0.8367 |
+| What is operational excellence? | aws_well_architected | 0.8149 |
+| How do I improve security? | aws_well_architected | 0.6609 |
+| What is the reliability pillar? | aws_well_architected | 0.8132 |
+
+All queries above 0.40 threshold. Cross-KB routing clean — every query landed in correct KB. WA scores 0.66–0.84, Jimmy scores 0.49–0.67.
+
+### Phase 8 Performance Fix
+
+**Problem:** WA queries hit API Gateway 29s hard timeout. Root cause: 58MB index + 256MB Lambda memory (CPU bottleneck on S3 load + cosine over 2,027 vectors) + max_tokens=512 allowing verbose Nebius responses. Cold worst-case was 32,279ms — 3,279ms over the limit.
+
+**Fix 1:** QueryLambda MemorySize 256MB → 1024MB (CloudFormation template + direct Lambda update)
+
+**Fix 2:** Module-level index caching in `src/lambdas/query/handler.py` — `_index_cache` global populated on first invocation, reused on warm containers. Confirmed working: CloudWatch log showed "Using cached vector index" on subsequent calls.
+
+**Fix 3:** max_tokens 512 → 256 on both Nebius and Bedrock generation paths (matched across providers). Ground truth confirmed via Nebius usage log: `completion_tokens=230, finish_reason=stop` at 1,155 chars — model answered naturally within the 256-token budget. Llama 3.3-70B effective ~5 chars/token on technical AWS content.
+
+**Fix 4 (permanent observability):** Added to Nebius generation path in `_generate_nebius`:
+- `[DEBUG] Nebius request body: {model, max_tokens, temperature}` — confirms serialized payload before send
+- `[INFO] Nebius usage: prompt_tokens=N completion_tokens=N finish_reason=X` — Nebius ground truth after response
+These logs are permanent. Do not remove in future changes.
+
+**Result:** Cold worst-case 32,279ms → 14,860ms (~54% reduction). Warm queries 5–8s. All queries pass under 29s API GW limit.
+
+**Step 7 (pending):** Full performance gate — cold start timing, warm cache confirmation, decision on whether to ship as-is or invest in parked levers before v1.0 tag.
+
+---
+
+## Phase 9 Candidates
+
+### Parked Latency Levers (ranked by impact)
+
+1. **EventBridge warm-up ping** — Scheduled rule pings query Lambda every 5 min to keep container warm. Eliminates cold starts entirely. Cost: ~$0.01/mo. No answer quality impact. Highest leverage per effort.
+2. **Index format change: 58MB JSON → ~12MB NumPy binary** — Float32 embeddings stored as binary instead of JSON strings. Cuts S3 transfer + parse time significantly. Requires ingest pipeline change.
+3. **Nebius Fast tier** — Higher per-token cost but faster streaming. Reduces Nebius generation wall time.
+4. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
+
+### Query Vocabulary Gap
+Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
 
 ---
 

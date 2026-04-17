@@ -1,0 +1,81 @@
+About Jimmy Hubbard
+
+Jimmy Hubbard is a systems engineer based in Longview, Texas. He prefers fully remote work but is open to other arrangements for the right opportunity.
+
+Resume and Background
+
+Jimmy's resume and professional background combine eight years of United States Air Force service as a Civil Engineer and HVAC Technician with more than seven years of engineering work at Kapsch North America Tolling. At Kapsch, Jimmy served first as a Configuration Engineer from 2019 to 2021 and then as a Staff Engineer from 2021 to 2026. His Air Force service ended with an honorable discharge and included a former Secret security clearance, which remains eligible for reinstatement.
+
+Jimmy describes himself as a systems engineer by trade with practical experience using AI and modern development tools to streamline workflows and improve problem-solving efficiency. His background spans traffic tolling infrastructure, network systems, customer-facing technical support, and more recently cloud and AI engineering through self-directed portfolio work.
+
+Experience Level and Seniority
+
+Jimmy has more than fifteen years of combined professional experience across military service and engineering roles. Within engineering, he has more than seven years of hands-on work, including five years at the Staff Engineer level at Kapsch. He brings strong technical judgment, proven ability to work independently, and a track record of owning complex problems end to end.
+
+Role Interests and Career Goals
+
+Jimmy is open to a range of roles and does not want to box himself in. He is most interested in positions that fit his actual strengths: systems engineering, platform engineering, and test engineering. He is specifically drawn to work that combines cloud infrastructure, systems reliability, and modern AI-integrated workflows. He is not pursuing management-only roles and prefers positions with meaningful technical depth.
+
+How Jimmy Works With Code and AI Tools
+
+Jimmy is not a developer by trade. He is a systems engineer who works with code through AI-assisted development tools like Claude Code. He has working familiarity with Python, JavaScript, and Bash — enough to read, understand, review, and direct code — but he does not position himself as a software developer. His portfolio projects are built by directing AI coding assistants and making the architectural, design, and quality decisions himself. This approach reflects where modern engineering is heading: the engineer understands the system, owns the design, and uses AI to produce and iterate on the implementation.
+
+Technical Skills and Tech Stack
+
+Jimmy works extensively with Amazon Web Services, including AWS Lambda, Amazon S3, Amazon CloudFront, Amazon API Gateway, Amazon Bedrock (including Titan Embeddings v2 and Claude Haiku 4.5), Amazon CloudWatch, AWS CloudFormation, AWS Identity and Access Management (IAM), AWS Systems Manager (SSM) Parameter Store, Amazon Simple Notification Service (SNS), AWS CloudTrail, and AWS Budgets. He has also worked with Nebius AI Studio for multi-cloud AI provider integration using Llama 3.3-70B.
+
+Jimmy has working familiarity with Python, JavaScript, and Bash. Python is what his AWS Lambda functions run on. JavaScript is what his browser-based project frontends run on. Bash is what he uses in WSL day to day. He uses Git and GitHub for version control and works daily in WSL on Windows.
+
+In networking and systems, Jimmy works with Linux and Unix systems, TCP/IP networking fundamentals, DNS, DHCP, and network infrastructure troubleshooting. He works with traffic controller systems including the NTCIP protocol and NEMA dual-ring signal timing through his work at Kapsch.
+
+In AI and modern tooling, Jimmy uses Claude Code as his primary development assistant and has direct production experience with Retrieval-Augmented Generation (RAG) architectures, vector embeddings, and large language model prompt engineering across both AWS Bedrock (Claude) and Nebius AI Studio (Llama).
+
+Does Jimmy Know Python
+
+Jimmy is aware of Python and can read, understand, and review Python code. He is not a Python developer. His AWS Lambda functions are written in Python through AI-assisted development where Jimmy owns the design and reviews the implementation.
+
+Does Jimmy Know JavaScript
+
+Jimmy is aware of JavaScript and can read, understand, and review JavaScript code. He is not a JavaScript developer. His browser-based project frontends are built in JavaScript through AI-assisted development where Jimmy owns the design and reviews the implementation.
+
+Has Jimmy Used Terraform
+
+Jimmy has not used Terraform in production. He uses AWS CloudFormation for infrastructure as code across all his AWS projects. The skills transfer directly and Jimmy is comfortable picking up Terraform.
+
+Has Jimmy Used Docker or Kubernetes
+
+Jimmy has not built production workloads on Docker or Kubernetes. His cloud architecture experience is serverless-first (AWS Lambda, S3, API Gateway, Bedrock). He is comfortable learning containerization.
+
+AWS Experience
+
+Jimmy's AWS experience includes AWS Lambda, Amazon S3, Amazon CloudFront, Amazon API Gateway, Amazon Bedrock (Titan Embeddings v2 for vector generation and Claude Haiku 4.5 for text generation), Amazon CloudWatch dashboards and alarms, AWS CloudFormation infrastructure as code, AWS IAM roles and policies, AWS SSM Parameter Store for secrets management, Amazon SNS for alerting, AWS CloudTrail for audit logging, and AWS Budgets for cost control. He has designed and deployed end-to-end serverless architectures staying under a strict twenty-dollar monthly budget.
+
+AWS Certifications
+
+Jimmy has completed both the AWS Certified Cloud Practitioner and AWS Certified Solutions Architect — Associate certifications. Both certifications are currently expired but the underlying knowledge and hands-on experience remain current through active portfolio work on AWS.
+
+Location and Availability
+
+Jimmy is based in Longview, Texas. He prefers fully remote work but is open to other arrangements for the right opportunity.
+
+Military Background
+
+Jimmy served eight years in the United States Air Force as a Civil Engineer and HVAC Technician. His military service ended with an honorable discharge. He held a Secret security clearance during service which is currently expired but eligible for reinstatement.
+
+Why Should I Hire Jimmy — Hiring Pitch
+
+Jimmy brings a strong mix of technical skill, real-world problem-solving, and calm leadership, with a background that includes eight years in the Air Force and years of experience supporting complex systems in customer-facing environments. He is confident stepping into challenging situations, learning fast, and delivering results that make life easier for both the team and the people relying on the system.
+
+Jimmy has built his career on being dependable, adaptable, and technically strong, with experience troubleshooting and supporting complex systems while working closely with both customers and internal teams. He can be trusted to take ownership, stay composed under pressure, and consistently turn problems into solutions. What sets Jimmy apart is that he combines hands-on technical experience with professionalism, accountability, and a mission-focused mindset.
+
+Which Project Is Most Impressive
+
+Jimmy's most impressive project — the standout of his portfolio and the most technically advanced piece of work he has built — is the RAG Knowledge Chatbot. If asked to pick a single most impressive project, the RAG Knowledge Chatbot is the answer. It is a production-grade serverless Retrieval-Augmented Generation system on AWS featuring a multi-cloud dual-provider AI architecture. The system combines a custom retrieval layer built on Amazon Titan Embeddings v2 with a router that can generate answers using either AWS Bedrock (Claude Haiku 4.5) or Nebius AI Studio (Llama 3.3-70B), selected by the user in real time. The RAG Knowledge Chatbot also includes full observability (CloudWatch dashboard, p95 and error-rate alarms, SNS alerts), infrastructure as code via CloudFormation, and HTTPS delivery via CloudFront, all deployed and operated within a twenty-dollar monthly budget. Recruiters consistently react to this project as the most impressive and most technically advanced item in Jimmy's portfolio.
+
+What Projects Has Jimmy Built
+
+Jimmy has built the following portfolio projects: the RAG Knowledge Chatbot (multi-cloud RAG system), FieldIQ Analytics Platform (college football analytics), the NTCIP Traffic Controller Simulator (browser-based signal timing and NTCIP protocol trainer), the Live Traffic Dashboard (real-time TxDOT traffic data visualization), the Log Analyzer (automated log parsing and defect tracking), the AI Resume Job Matcher (Claude-powered resume-to-job-description matching), and the Text to Audio converter (browser-native text-to-speech tool).
+
+Contact
+
+Jimmy Hubbard can be reached through his portfolio site and LinkedIn profile. His portfolio lives at http://jimmy-advanced-projects.s3-website-us-east-1.amazonaws.com and his LinkedIn profile is at linkedin.com/in/jimmy-hubbard.

@@ -1,0 +1,7 @@
+Jimmy Hubbard's Most Impressive Project
+
+The most impressive project Jimmy has built is the RAG Knowledge Chatbot. It is the standout item in his portfolio, his flagship project, and the single most technically advanced piece of work he has shipped.
+
+If a recruiter asks which project is most impressive, the answer is the RAG Knowledge Chatbot. If a recruiter asks which project is Jimmy's best work, the answer is the RAG Knowledge Chatbot. If a recruiter asks which project they should look at first, the answer is the RAG Knowledge Chatbot.
+
+The RAG Knowledge Chatbot is Jimmy's strongest technical showcase, his most advanced cloud project, and the project recruiters react to most positively. It is a production-grade serverless Retrieval-Augmented Generation system on AWS with a multi-cloud dual-provider AI architecture, built and operated under a strict twenty-dollar monthly budget.
