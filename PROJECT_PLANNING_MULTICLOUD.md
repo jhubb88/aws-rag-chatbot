@@ -1,5 +1,5 @@
 # RAG Knowledge Chatbot — Project Planning Document
-### Multi-Cloud Edition | Last Updated: 2026-04-16
+### Multi-Cloud Edition | Last Updated: 2026-04-17
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 **Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
@@ -8,7 +8,7 @@
 **Phase 5 Status:** ✅ Complete — CloudWatch dashboard + alarms, SNS alerts, CloudFront HTTPS (`https://d1r1qv7io7k8vk.cloudfront.net`), model migration to `us.anthropic.claude-haiku-4-5-20251001-v1:0`, commit `beae846`, tag `v0.7-observability`. Bedrock smoke test PASSED — both providers fully operational.
 **Phase 6 Status:** ✅ Complete — full stack integration tested, all providers passing, commit `d665d53`, tag `v0.8-integration`
 **Phase 7 Status:** ✅ Complete — empty state, top bar subtitle, contrast fix, About modal, commit `2fba0f4`, tag `v0.9-polish`
-**Phase 8 Status:** 🔄 In Progress — Steps 1–6 complete, Step 7 (performance gate) pending, Step 8 (commit/tag/push) pending
+**Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `TBD`, tag `v1.0-multikb`
 
 ---
 
@@ -117,7 +117,7 @@ added to `data/curated/` and ingested: `project_index.txt`, `project_summary.txt
 aws configure list --profile portfolio-user
 ```
 
-### WA Query Latency — ⚠️ MITIGATED (2026-04-17)
+### WA Query Latency — ✅ RESOLVED (2026-04-17)
 Phase 8 WA queries were hitting the API Gateway 29s hard timeout due to: 256MB Lambda memory (insufficient CPU for 58MB index), no index caching, and max_tokens=512 allowing verbose Nebius responses. Three fixes applied:
 - QueryLambda MemorySize 256MB → 1024MB (CloudFormation + direct update)
 - Module-level index caching in query Lambda (warm containers skip S3 load)
@@ -152,7 +152,7 @@ echo "YOUR_GHP_TOKEN" | gh auth login --hostname github.com --git-protocol https
 | Phase 6 | Integration testing | ✅ Complete — 9/9 tests passed, F1/F2 fixed, alarm tuned 10s→12s, tag `v0.8-integration` |
 | Phase 7 | Portfolio polish + About modal | ✅ Complete — empty state UX, subtitle, contrast, About modal, tag `v0.9-polish` |
 | Phase 7.5 | Portfolio site card update (lives in portfolio-site repo) | ⏳ Not started |
-| Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | 🔄 In Progress — Steps 1–6 ✅, Step 7 (perf gate) ⏳, Step 8 (commit/tag) ⏳ |
+| Phase 8 | Multi-KB expansion: AWS Well-Architected Framework | ✅ Complete — commit `TBD`, tag `v1.0-multikb` |
 
 ---
 
@@ -323,7 +323,28 @@ These logs are permanent. Do not remove in future changes.
 
 **Result:** Cold worst-case 32,279ms → 14,860ms (~54% reduction). Warm queries 5–8s. All queries pass under 29s API GW limit.
 
-**Step 7 (pending):** Full performance gate — cold start timing, warm cache confirmation, decision on whether to ship as-is or invest in parked levers before v1.0 tag.
+**Step 7 — Performance gate: ✅ PASS.** EventBridge warm-up ping deployed (`rate(5 minutes)`, payload `{"warmup": true}`). Warmup branch confirmed: 2.56ms duration, no Bedrock/Nebius calls. All 8 warm queries under 12s:
+
+| Query | Provider | Wall time | Lambda duration | completion_tokens | Chars |
+|---|---|---|---|---|---|
+| Why hire Jimmy? | Bedrock | 4.55s | ~4,171ms | — | 1,243 |
+| Optimize cost on AWS? | Bedrock | 4.61s | ~4,175ms | — | 1,105 |
+| Six pillars? | Bedrock | 3.05s | ~2,583ms | — | 616 |
+| Operational excellence? | Bedrock | 4.71s | ~4,400ms | — | 1,413 |
+| Why hire Jimmy? | Nebius | 4.16s | 3,799ms | 98 (stop) | 595 |
+| Optimize cost on AWS? | Nebius | 8.62s | 8,261ms | 241 (stop) | 1,217 |
+| Six pillars? | Nebius | 3.13s | 2,821ms | 64 (stop) | 307 |
+| Operational excellence? | Nebius | 6.00s | 5,760ms | 98 (stop) | 602 |
+
+Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contrast makes the provider toggle meaningful as a demo feature.
+
+**Step 8 — Deployment:**
+- EventBridge rule `rag-chatbot-warmup-dev` created via CLI (CFN early-validation error on this stack is a recurring blocker — resources are correct in template for future full deploys)
+- `lambda:AddPermission` granted to `events.amazonaws.com` (`EventBridgeWarmupPermission`)
+- Frontend default switched to Bedrock (`selected` attribute on bedrock option)
+- Query Lambda deployed with warmup branch + max_tokens=256 + index caching
+- Frontend deployed to S3 + CloudFront invalidation `I27FTAYSL2YZ7ICI07W5TGD70V`
+- Smoke test: CloudFront 200, bedrock selected in served HTML, both providers returning real answers with correct KB routing
 
 ---
 
@@ -336,8 +357,24 @@ These logs are permanent. Do not remove in future changes.
 3. **Nebius Fast tier** — Higher per-token cost but faster streaming. Reduces Nebius generation wall time.
 4. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
 
+### Bedrock Completion Tokens Logging Symmetry
+Nebius path logs `completion_tokens` and `finish_reason` via the permanent usage log. Bedrock path has no equivalent — CloudWatch shows Lambda duration but not token usage. Add a usage log to `_generate_bedrock` mirroring the Nebius pattern for consistent observability across both providers.
+
 ### Query Vocabulary Gap
 Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
+
+---
+
+## Phase 8 — Multi-KB Expansion ✅ Complete (2026-04-17) | commit `TBD` | tag `v1.0-multikb`
+
+All 8 steps complete. See Phase 8 Progress and Phase 8 Performance Fix subsections above for full details.
+
+**Final state:**
+- 2,027-chunk combined index: `jimmy_background` (43 + curated) + `aws_well_architected` (1,974)
+- EventBridge warm-up ping every 5 min — cold starts eliminated for demo use
+- Bedrock selected by default on page load
+- Warm baseline: Bedrock 3–5s, Nebius 3–9s
+- CloudFront URL: `https://d1r1qv7io7k8vk.cloudfront.net`
 
 ---
 

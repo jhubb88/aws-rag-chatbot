@@ -44,6 +44,16 @@ _index_cache = None
 
 def lambda_handler(event, context):
     """Entry point for the Query Lambda."""
+
+    # Warm-up ping from EventBridge — return immediately before any Bedrock/Nebius calls
+    if event.get("warmup"):
+        print("[INFO] Warm-up ping received — container is warm")
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": '{"status": "warm"}',
+        }
+
     print("[INFO] Query Lambda invoked")
 
     # Parse request body

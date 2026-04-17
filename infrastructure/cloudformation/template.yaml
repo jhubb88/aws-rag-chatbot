@@ -392,6 +392,27 @@ Resources:
         - Key: Project
           Value: rag-chatbot
 
+  # EventBridge rule: ping QueryLambda every 5 minutes to keep container warm
+  QueryLambdaWarmupRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "rag-chatbot-warmup-${Environment}"
+      Description: "Ping QueryLambda every 5 minutes to keep container warm"
+      ScheduleExpression: "rate(5 minutes)"
+      State: ENABLED
+      Targets:
+        - Id: QueryLambdaWarmupTarget
+          Arn: !GetAtt QueryLambda.Arn
+          Input: '{"warmup": true}'
+
+  QueryLambdaWarmupPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt QueryLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt QueryLambdaWarmupRule.Arn
+
   # Allows API Gateway to invoke QueryLambda
   QueryLambdaApiGatewayPermission:
     Type: AWS::Lambda::Permission
