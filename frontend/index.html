@@ -1024,8 +1024,11 @@
     function wireEmptyStatePrompts() {
       document.querySelectorAll('.empty-state__prompt-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          document.getElementById('query-input').value = btn.textContent;
-          handleSubmit();
+          if (isProcessing) return;
+          const input = document.getElementById('query-input');
+          input.value = btn.textContent;
+          autoResize(input);
+          submitQuery(btn.textContent);
         });
       });
     }
