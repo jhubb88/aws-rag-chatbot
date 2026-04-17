@@ -387,6 +387,24 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 ### Bedrock Completion Tokens Logging Symmetry ✅ Complete (2026-04-17) | commit `92fc076`
 Added `[DEBUG] Bedrock request: model=... max_tokens=256` before `invoke_model` and `[INFO] Bedrock usage: input_tokens=N output_tokens=N stop_reason=X` after response parse. Uses Bedrock-native field names (`input_tokens` / `output_tokens` / `stop_reason`) matching Anthropic's response shape. Confirmed in CloudWatch: `input_tokens=926 output_tokens=255 stop_reason=end_turn` on first post-deploy query.
 
+### Bedrock Prompt Tuning + Asymmetric max_tokens ✅ Complete (2026-04-17) | commit `4768755`
+**Problem:** Bedrock Claude was producing section-heavy markdown answers that truncated at the 256-token ceiling. 3 of 4 test queries returned `stop_reason=max_tokens`. Nebius finished naturally at 256 because its system prompt already included "Be concise and accurate."
+
+**Fix 1 — Prompt tuning:** Added concision instruction to the Bedrock user message: *"Be concise. Answer in 2-3 short paragraphs. Use markdown headers only if the question genuinely requires distinct sections."* Kept role definition, dual-KB binding, and context injection unchanged.
+
+**Fix 2 — Safety-net cap raise:** Bedrock `max_tokens` raised from 256 → 384. Nebius left at 256 (already producing natural stops). Providers are now intentionally asymmetric: Bedrock 384, Nebius 256.
+
+**Validation (4-query test post-deploy):**
+
+| Query | output_tokens | stop_reason | Wall time |
+|---|---|---|---|
+| What are the six pillars? | 146 | end_turn | 7.1s |
+| What is the NTCIP simulator? | 221 | end_turn | 8.5s |
+| Why should I hire Jimmy? | 197 | end_turn | 8.1s |
+| How do I optimize cost on AWS? | 255 | end_turn | 8.1s |
+
+4/4 end_turn. Zero max_tokens hits at 384. Wall times elevated due to cold containers post-deploy; warm baseline is 3–5s.
+
 ### Query Vocabulary Gap
 Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
 
