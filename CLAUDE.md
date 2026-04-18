@@ -27,6 +27,7 @@ These rules apply to every Claude Code session in this project without exception
 - Never batch or deliver CC prompts ahead of time — one at a time, only when needed
 - When retrieval returns an answer that contradicts known source content, the first diagnostic step is to inspect top-K retrieved chunks AND their full ranking in CloudWatch logs or via direct index query — not to rewrite the source file. Source rewrites are a downstream fix; retrieval diagnosis comes first.
 - Nebius warmup ping in query Lambda's warmup branch is permanent. Do not remove or alter without explicit approval. Ground truth log lines `[INFO] Nebius warmup: duration_ms=X status=ok` and `[WARNING] Nebius warmup failed: <error>` are also permanent.
+- Nebius Fast tier not available for Llama 3.3-70B as of 2026-04-18.
 
 ## Portfolio Context
 - The portfolio-wide infrastructure reference lives at:

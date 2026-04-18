@@ -382,7 +382,7 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 ~~1. **EventBridge warm-up ping**~~ — ✅ Complete (2026-04-18, commit `b36c69c`). See Nebius Warmup Ping below.
 
 1. **Index format change: 58MB JSON → ~12MB NumPy binary** — Float32 embeddings stored as binary instead of JSON strings. Cuts S3 transfer + parse time significantly. Requires ingest pipeline change.
-2. **Nebius Fast tier** — Higher per-token cost but faster streaming. Reduces Nebius generation wall time.
+2. **Nebius Fast tier** — N/A as of 2026-04-18. Verified against Nebius models API: `meta-llama/Llama-3.3-70B-Instruct` has no `-fast` variant published. Fast tier exists for other models (DeepSeek V3.2, Qwen 3.5, Kimi K2.5, GPT-OSS variants) but would require a full model swap, not a tier swap. Parked pending either (a) Nebius publishing Llama 3.3-70B-fast, or (b) a deliberate decision to change Nebius models entirely.
 3. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
 
 ### Bedrock Completion Tokens Logging Symmetry ✅ Complete (2026-04-17) | commit `92fc076`
