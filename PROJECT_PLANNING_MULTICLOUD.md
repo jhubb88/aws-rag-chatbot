@@ -379,10 +379,11 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 
 ### Parked Latency Levers (ranked by impact)
 
-1. **EventBridge warm-up ping** — Scheduled rule pings query Lambda every 5 min to keep container warm. Eliminates cold starts entirely. Cost: ~$0.01/mo. No answer quality impact. Highest leverage per effort.
-2. **Index format change: 58MB JSON → ~12MB NumPy binary** — Float32 embeddings stored as binary instead of JSON strings. Cuts S3 transfer + parse time significantly. Requires ingest pipeline change.
-3. **Nebius Fast tier** — Higher per-token cost but faster streaming. Reduces Nebius generation wall time.
-4. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
+~~1. **EventBridge warm-up ping**~~ — ✅ Complete (2026-04-18, commit `b36c69c`). See Nebius Warmup Ping below.
+
+1. **Index format change: 58MB JSON → ~12MB NumPy binary** — Float32 embeddings stored as binary instead of JSON strings. Cuts S3 transfer + parse time significantly. Requires ingest pipeline change.
+2. **Nebius Fast tier** — Higher per-token cost but faster streaming. Reduces Nebius generation wall time.
+3. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
 
 ### Bedrock Completion Tokens Logging Symmetry ✅ Complete (2026-04-17) | commit `92fc076`
 Added `[DEBUG] Bedrock request: model=... max_tokens=256` before `invoke_model` and `[INFO] Bedrock usage: input_tokens=N output_tokens=N stop_reason=X` after response parse. Uses Bedrock-native field names (`input_tokens` / `output_tokens` / `stop_reason`) matching Anthropic's response shape. Confirmed in CloudWatch: `input_tokens=926 output_tokens=255 stop_reason=end_turn` on first post-deploy query.
@@ -447,7 +448,7 @@ Both providers now have instruction-tuned system prompts. Bedrock tuned for conc
 Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
 
 ### Retrieval Miss on Projects List Query — Diagnosis (2026-04-18)
-**Status: open — fix proposed, not yet applied**
+**Status: ✅ Resolved 2026-04-18, commit `b30b6ab` — TOP_K raised 3→5. See "Retrieval Fix + Content Drift" below.**
 
 **Symptom:** Both providers return incomplete answers to "What projects has Jimmy built?" — Bedrock hedges with "context doesn't provide details about other specific projects," Nebius with "no other projects are mentioned in the provided context."
 
@@ -467,6 +468,44 @@ Open-ended recruiter queries like "what should I look at first" score below 0.40
 **Proposed fix:** Raise top_k from 3 to 5 in the query Lambda. This places project_index.txt (0.4179) and project_summary.txt (0.3858) into the generator's context alongside the current top-3, giving both providers the full projects list.
 
 **Secondary observation:** Shorter dense enumeration chunks (project_index.txt, 345 chars, score 0.4179) outscored longer verbose versions (project_summary.txt, 1,283 chars, score 0.3858) on this list-style query. Useful signal for curated content structure decisions.
+
+### Retrieval Fix + Content Drift ✅ Complete (2026-04-18) | commits `b30b6ab`, `f0dd24d`
+
+**b30b6ab — TOP_K 3→5 in `src/lambdas/query/handler.py`**
+
+Root cause: `project_index.txt` (clean 7-project enumeration, 345 chars) scored 0.4179 and ranked 5th of 2,027 chunks — excluded by `top_k=3`. Narrative career chunks outranked the clean list by 0.05–0.07 points (`highlight_index` 0.4857, Experience/Seniority 0.4547) because they share vocabulary with "built / projects / Jimmy." The retrieval ordering was correct; the cutoff was too tight for a 2,027-chunk index. Fix: raise `top_k` to 5 so the retrieval window includes the list chunk. Both providers now correctly name all 7 projects on "What projects has Jimmy built?"
+
+**f0dd24d — Committed working tree drift on `data/curated/about_jimmy.txt`**
+
+The "Why hire Jimmy" 3-sentence pitch rewrite from 2026-04-17 was live in the ingested index but never committed to git. HEAD was stale relative to production. No behavior change — purely git hygiene.
+
+### Nebius Warmup Ping ✅ Complete (2026-04-18) | commit `b36c69c`
+
+**Problem:** Nebius first-call-after-idle penalty. The Lambda container stayed warm via the existing EventBridge ping (2–3ms early return), but the Nebius inference endpoint was still going cold between real user queries. The container being warm doesn't mean the external provider's endpoint is warm.
+
+**Fix:** Synthetic Nebius call added to the warmup branch in `src/lambdas/query/handler.py` via new `_warmup_nebius()` helper function, called on every EventBridge warmup cycle (every 5 min). Payload: `model=meta-llama/Llama-3.3-70B-Instruct`, `messages=[{role:user, content:ping}]`, `max_tokens=1`, `temperature=0`. Wrapped in `try/except`, 20s timeout, never fails the Lambda invocation. Reuses `_get_nebius_api_key()` — no SSM logic duplicated. Bedrock has no equivalent penalty; no Bedrock warmup call was added.
+
+**Before/After (Lambda REPORT duration, first-call-after-idle):**
+
+| Metric | Pre-warmup (n=10, CloudWatch historical) | Post-warmup (n=3, controlled test) |
+|--------|------------------------------------------|-------------------------------------|
+| Min | 3.10s | 4.80s |
+| Median | 8.25s | — |
+| Avg | — | 5.52s |
+| Max | 14.86s | 6.26s |
+| Spread | 11.76s | 1.46s |
+
+The "10–18s baseline" referenced in earlier session notes was an eyeball estimate, not real data. True pre-warmup baseline from CloudWatch REPORT durations (10 qualifying invocations over 7 days): min 3.10s, median 8.25s, max 14.86s.
+
+Key improvement: variance collapsed from 11.76s to 1.46s. The 10–15s tail is gone — every measured first-call post-warmup was between 4.8s and 6.3s. The warmup ping reduces first-call median by ~33%, worst-case by ~58%, collapses variance from 11.76s to 1.46s. User-perceived wall time on CloudFront is roughly Lambda REPORT + 500–1500ms for edge hops and frontend render, so real first-call UX is approximately 6–8s.
+
+Caveat: one pre-warmup result at 3.10s suggests Nebius's endpoint is occasionally warm from other customer traffic. The ping doesn't create warmth that didn't exist — it makes reliable what was previously lucky.
+
+**Cost:** ~8,640 pings/month × ~11 tokens/ping ≈ 95K tokens/month. Well under $0.05/month at Nebius pricing.
+
+**Ground truth logging (permanent — do not remove):**
+- `[INFO] Nebius warmup: duration_ms=X status=ok` on success
+- `[WARNING] Nebius warmup failed: <error>` on failure (includes HTTP status code for HTTPError)
 
 ---
 
