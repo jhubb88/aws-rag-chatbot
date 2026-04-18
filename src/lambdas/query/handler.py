@@ -17,6 +17,7 @@ CORS: Every response includes Access-Control-Allow-Origin: '*' so Phase 4 browse
 import json
 import os
 import math
+import time
 import urllib.request
 import urllib.error
 import boto3
@@ -45,9 +46,10 @@ _index_cache = None
 def lambda_handler(event, context):
     """Entry point for the Query Lambda."""
 
-    # Warm-up ping from EventBridge — return immediately before any Bedrock/Nebius calls
+    # Warm-up ping from EventBridge
     if event.get("warmup"):
         print("[INFO] Warm-up ping received — container is warm")
+        _warmup_nebius()
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
@@ -295,6 +297,40 @@ def _get_nebius_api_key():
     except Exception as e:
         print(f"[ERROR] SSM fetch failed: {e}")
         return None
+
+
+def _warmup_nebius() -> None:
+    """Fire a cheap synthetic Nebius call to keep their inference endpoint warm.
+    Never raises — all errors are caught and logged as WARNING."""
+    try:
+        api_key = _get_nebius_api_key()
+
+        payload = json.dumps({
+            "model": NEBIUS_MODEL,
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 1,
+            "temperature": 0,
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            NEBIUS_ENDPOINT,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        t0 = time.time()
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            resp.read()
+        duration_ms = round((time.time() - t0) * 1000)
+        print(f"[INFO] Nebius warmup: duration_ms={duration_ms} status=ok")
+    except urllib.error.HTTPError as e:
+        print(f"[WARNING] Nebius warmup failed: HTTP {e.code}")
+    except Exception as e:
+        print(f"[WARNING] Nebius warmup failed: {e}")
 
 
 # ---------------------------------------------------------------------------
