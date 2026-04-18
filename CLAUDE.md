@@ -1,5 +1,5 @@
 # CLAUDE.md — RAG Chatbot Global Rules
-Last updated: 2026-04-14
+Last updated: 2026-04-18
 
 These rules apply to every Claude Code session in this project without exception.
 
@@ -25,6 +25,7 @@ These rules apply to every Claude Code session in this project without exception
 - Flag problems before they become problems
 - Never force push without explicit confirmation from Jimmy
 - Never batch or deliver CC prompts ahead of time — one at a time, only when needed
+- When retrieval returns an answer that contradicts known source content, the first diagnostic step is to inspect top-K retrieved chunks AND their full ranking in CloudWatch logs or via direct index query — not to rewrite the source file. Source rewrites are a downstream fix; retrieval diagnosis comes first.
 
 ## Portfolio Context
 - The portfolio-wide infrastructure reference lives at:
@@ -70,3 +71,11 @@ These rules apply to every Claude Code session in this project without exception
 - Account ID: 603509861186
 - AWS CLI profile: portfolio-user
 - SSM Nebius API key path: /rag-chatbot/nebius-api-key (already exists — do not overwrite)
+
+## Known Retrieval Issues
+
+### "What projects has Jimmy built?" — retrieval miss (2026-04-18)
+**Query:** "What projects has Jimmy built?"
+**Symptom:** Both providers hedge with "context doesn't provide details about other specific projects" despite the answer existing in three index chunks. The cleanest chunk (project_index.txt, 345 chars) scored 0.4179 and ranked 5th overall — missing the top-3 cutoff by 0.0329.
+**Root cause:** top_k=3 is too aggressive for a 2,027-chunk index. Narrative career chunks outrank enumeration chunks due to vocabulary overlap with "built / projects / Jimmy." The index content is correct; the cutoff is too tight.
+**Status:** open — fix candidate is top_k 3→5 in query Lambda. Not yet applied, pending Jimmy's decision.

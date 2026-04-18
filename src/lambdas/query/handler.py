@@ -30,7 +30,7 @@ HAIKU_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0"  # cross-region infe
 NEBIUS_ENDPOINT = "https://api.studio.nebius.ai/v1/chat/completions"
 NEBIUS_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 SSM_KEY_PATH = os.environ.get("NEBIUS_API_KEY_PATH", "/rag-chatbot/nebius-api-key")
-TOP_K = 3
+TOP_K = 5
 CHUNK_CHAR_CAP = 2000  # max chars per chunk sent to the model
 
 # --- AWS clients ---

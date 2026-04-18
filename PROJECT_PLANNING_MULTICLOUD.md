@@ -446,6 +446,28 @@ Both providers now have instruction-tuned system prompts. Bedrock tuned for conc
 ### Query Vocabulary Gap
 Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
 
+### Retrieval Miss on Projects List Query — Diagnosis (2026-04-18)
+**Status: open — fix proposed, not yet applied**
+
+**Symptom:** Both providers return incomplete answers to "What projects has Jimmy built?" — Bedrock hedges with "context doesn't provide details about other specific projects," Nebius with "no other projects are mentioned in the provided context."
+
+**Retrieval data (query: "What projects has Jimmy built?", top_k=3, 2,027-chunk index):**
+
+| Rank | Source | Score |
+|---|---|---|
+| 1 | highlight_index.txt | 0.4857 |
+| 2 | about_jimmy.txt — Experience/Seniority | 0.4547 |
+| 3 | about_jimmy.txt — hiring pitch | 0.4508 |
+| 5 | project_index.txt (345 chars, all 7 projects) | 0.4179 |
+| 7 | project_summary.txt (1,283 chars, all 7 projects) | 0.3858 |
+| 8 | about_jimmy.txt — projects section (contaminated RAG preamble) | 0.3601 |
+
+**Root cause:** top_k=3 is too aggressive for a 2,027-chunk index with overlapping narrative content. The projects-list content IS present in the index — three chunks contain it, the cleanest one (project_index.txt, position 39) scored 0.4179 and ranked 5th overall, 0.0329 below the rank-3 cutoff. Narrative chunks about Jimmy's career outrank enumeration chunks because the query shares vocabulary with career accomplishment language. The retrieval ordering is correct; the cutoff is too tight.
+
+**Proposed fix:** Raise top_k from 3 to 5 in the query Lambda. This places project_index.txt (0.4179) and project_summary.txt (0.3858) into the generator's context alongside the current top-3, giving both providers the full projects list.
+
+**Secondary observation:** Shorter dense enumeration chunks (project_index.txt, 345 chars, score 0.4179) outscored longer verbose versions (project_summary.txt, 1,283 chars, score 0.3858) on this list-style query. Useful signal for curated content structure decisions.
+
 ---
 
 ## Phase 8 — Multi-KB Expansion ✅ Complete (2026-04-17) | commit `TBD` | tag `v1.0-multikb`
