@@ -81,3 +81,21 @@ These rules apply to every Claude Code session in this project without exception
 **Symptom:** Both providers hedge with "context doesn't provide details about other specific projects" despite the answer existing in three index chunks. The cleanest chunk (project_index.txt, 345 chars) scored 0.4179 and ranked 5th overall — missing the top-3 cutoff by 0.0329.
 **Root cause:** top_k=3 is too aggressive for a 2,027-chunk index. Narrative career chunks outrank enumeration chunks due to vocabulary overlap with "built / projects / Jimmy." The index content is correct; the cutoff is too tight.
 **Status:** resolved 2026-04-18 commit b30b6ab — TOP_K raised 3→5, both providers now name all 7 projects. Nebius first-call-after-idle latency (true baseline: min 3.10s, median 8.25s, max 14.86s from CloudWatch REPORT — prior "10–18s" estimate was eyeball, not data) is a Nebius-side characteristic, not related to this fix. Warmup ping (commit b36c69c) reduces first-call median by ~33%, worst-case by ~58%.
+
+## README Maintenance Rule
+
+README.md is a living document and must be kept current as code and infrastructure change. Every Claude Code session that makes significant changes to this project MUST update README.md as part of the same work, not as a separate cleanup pass.
+
+Triggers that require README.md updates:
+- Model change (either provider) — update Tech Stack table, Architecture section, Engineering Decisions if the change is load-bearing
+- Provider change (switching Nebius to Groq/Together/etc., or adding a third provider) — update all references including the opening paragraph
+- New AWS service added or removed from the stack — update Tech Stack table
+- New KB added or KB scope changed — update What This Project Is, Architecture, Engineering Decisions
+- New latency lever shipped (streaming, index format change, etc.) — update Engineering Decisions
+- Cost structure changes materially — update Cost Guardrails numbers
+- New tag (v1.1, v2.0, etc.) — update Current Status
+- Phase 9 items completed — move relevant lines out of the "active work" mention
+
+README.md updates should be committed in the SAME commit as the code change that triggered them, not as a separate docs commit. This keeps the history honest — the README shows what was true at each tag, not what was aspirational.
+
+A full README polish pass should happen before Jimmy actively shares the GitHub link with recruiters. Do not skip that pass assuming incremental updates have kept it clean.
