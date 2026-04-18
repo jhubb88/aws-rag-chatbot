@@ -11,6 +11,8 @@
 **Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `f872fc0`, tag `v1.0-multikb`
 **Phase 8.5 Status:** ✅ Complete — mobile responsive layout, iPhone Safari bugs resolved, commit `ba601b5` (no new tag — v1.0-multikb stands)
 
+> **Next session (2026-04-18 → 2026-04-19):** Nebius AI Studio provider will be swapped to SambaNova. Decision made 2026-04-18. See Phase 9 Candidates → Nebius Provider Swap for details. All Nebius references in this doc remain accurate until the swap is deployed.
+
 ---
 
 ## What This Project Is
@@ -382,8 +384,7 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 ~~1. **EventBridge warm-up ping**~~ — ✅ Complete (2026-04-18, commit `b36c69c`). See Nebius Warmup Ping below.
 
 1. **Index format change: 58MB JSON → ~12MB NumPy binary** — Float32 embeddings stored as binary instead of JSON strings. Cuts S3 transfer + parse time significantly. Requires ingest pipeline change.
-2. **Nebius Fast tier** — N/A as of 2026-04-18. Verified against Nebius models API: `meta-llama/Llama-3.3-70B-Instruct` has no `-fast` variant published. Fast tier exists for other models (DeepSeek V3.2, Qwen 3.5, Kimi K2.5, GPT-OSS variants) but would require a full model swap, not a tier swap. Parked pending either (a) Nebius publishing Llama 3.3-70B-fast, or (b) a deliberate decision to change Nebius models entirely.
-3. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
+2. **Response streaming to frontend** — Cuts perceived latency without reducing total time. Requires API Gateway + Lambda streaming setup.
 
 ### Bedrock Completion Tokens Logging Symmetry ✅ Complete (2026-04-17) | commit `92fc076`
 Added `[DEBUG] Bedrock request: model=... max_tokens=256` before `invoke_model` and `[INFO] Bedrock usage: input_tokens=N output_tokens=N stop_reason=X` after response parse. Uses Bedrock-native field names (`input_tokens` / `output_tokens` / `stop_reason`) matching Anthropic's response shape. Confirmed in CloudWatch: `input_tokens=926 output_tokens=255 stop_reason=end_turn` on first post-deploy query.
@@ -506,6 +507,24 @@ Caveat: one pre-warmup result at 3.10s suggests Nebius's endpoint is occasionall
 **Ground truth logging (permanent — do not remove):**
 - `[INFO] Nebius warmup: duration_ms=X status=ok` on success
 - `[WARNING] Nebius warmup failed: <error>` on failure (includes HTTP status code for HTTPError)
+
+### Nebius Provider Swap → SambaNova (decided, implementation pending)
+
+Decision made 2026-04-18. Research via Perplexity covered SambaNova, Groq, Cerebras, Fireworks, Together AI, and DeepInfra for Llama 3.3-70B specifically.
+
+**Selected: SambaNova.** Model: `Meta-Llama-3.3-70B-Instruct`, endpoint: `https://api.sambanova.ai/v1`, auth: bearer token in SSM.
+
+Expected outcome: Nebius warm baseline 3–9s → SambaNova sub-2s. First-call-after-idle 5.5s → sub-2s.
+
+Cost delta: Nebius Base tier $0.13/$0.40 per M tokens → SambaNova $0.60/$1.20. Still under $1/M blended. Monthly impact roughly $0.30–0.50 at demo volume, well within $20 cap.
+
+Free tier: 240 RPM, 48K requests/day, no credit card required.
+
+Groq rejected: 12K TPM free tier cap would trigger 429s during a recruiter demo at our ~1,050 tokens/query average.
+
+Implementation scope: swap `NEBIUS_ENDPOINT`, `NEBIUS_MODEL`, SSM key path; test warmup ping against new provider; validate with Nebius system prompt (already tuned for Llama); update README Tech Stack table; update About modal and subtitle in frontend.
+
+Estimated work: 45–60 min CC session including validation and docs.
 
 ---
 
