@@ -81,7 +81,7 @@ Set to 3s. If WARNING logs appear on warmup pings during normal SambaNova operat
 **Query:** "What projects has Jimmy built?"
 **Symptom:** Both providers hedge with "context doesn't provide details about other specific projects" despite the answer existing in three index chunks. The cleanest chunk (project_index.txt, 345 chars) scored 0.4179 and ranked 5th overall — missing the top-3 cutoff by 0.0329.
 **Root cause:** top_k=3 is too aggressive for a 2,027-chunk index. Narrative career chunks outrank enumeration chunks due to vocabulary overlap with "built / projects / Jimmy." The index content is correct; the cutoff is too tight.
-**Status:** resolved 2026-04-18 commit b30b6ab — TOP_K raised 3→5, both providers now name all 7 projects. SambaNova (replacing Nebius 2026-04-19) first-call-after-idle latency: ~2.5s median with warmup ping active. Warmup ping (commit b36c69c, updated for SambaNova) completes in ~631ms — resolves p95 alarm that Nebius's 20s warmup timeout was triggering.
+**Status:** resolved 2026-04-18 commit b30b6ab — TOP_K raised 3→5, both providers now name all 7 projects. First-touch cold (post warmup hardening, commit `87e1e21`): ~4.7s Lambda, cache hit confirmed. Warmup now primes index cache + uses 3s SambaNova timeout — p95 alarm stable.
 
 ## README Maintenance Rule
 

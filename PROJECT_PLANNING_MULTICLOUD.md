@@ -531,7 +531,7 @@ The "Why hire Jimmy" 3-sentence pitch rewrite from 2026-04-17 was live in the in
 
 **Problem:** External provider first-call-after-idle penalty. The Lambda container stayed warm via the existing EventBridge ping (2–3ms early return), but the inference endpoint itself was going cold between real user queries. The container being warm doesn't mean the external provider's endpoint is warm.
 
-**Fix:** Synthetic provider call added to the warmup branch in `src/lambdas/query/handler.py` via `_warmup_sambanova()` (originally `_warmup_nebius()`, renamed 2026-04-19 during SambaNova swap), called on every EventBridge warmup cycle (every 5 min). Payload: `model=Meta-Llama-3.3-70B-Instruct`, `messages=[{role:user, content:ping}]`, `max_tokens=1`, `temperature=0`. Wrapped in `try/except`, 20s timeout, never fails the Lambda invocation. Bedrock has no equivalent penalty; no Bedrock warmup call was added.
+**Fix:** Synthetic provider call added to the warmup branch in `src/lambdas/query/handler.py` via `_warmup_sambanova()` (originally `_warmup_nebius()`, renamed 2026-04-19 during SambaNova swap), called on every EventBridge warmup cycle (every 5 min). Payload: `model=Meta-Llama-3.3-70B-Instruct`, `messages=[{role:user, content:ping}]`, `max_tokens=1`, `temperature=0`. Wrapped in `try/except`, 20s timeout (lowered to 3s on 2026-04-19 — see Warmup Hardening section), never fails the Lambda invocation. Bedrock has no equivalent penalty; no Bedrock warmup call was added.
 
 **Before/After (Lambda REPORT duration, first-call-after-idle):**
 
@@ -545,7 +545,7 @@ The "Why hire Jimmy" 3-sentence pitch rewrite from 2026-04-17 was live in the in
 
 The "10–18s baseline" referenced in earlier session notes was an eyeball estimate, not real data. True pre-warmup baseline from CloudWatch REPORT durations (10 qualifying invocations over 7 days): min 3.10s, median 8.25s, max 14.86s.
 
-Key improvement: variance collapsed from 11.76s to 1.46s. The 10–15s tail is gone — every measured first-call post-warmup was between 4.8s and 6.3s. The warmup ping reduces first-call median by ~33%, worst-case by ~58%, collapses variance from 11.76s to 1.46s. User-perceived wall time on CloudFront is roughly Lambda REPORT + 500–1500ms for edge hops and frontend render, so real first-call UX is approximately 6–8s.
+Key improvement: variance collapsed from 11.76s to 1.46s. The 10–15s tail is gone — every measured first-call post-warmup was between 4.8s and 6.3s. The warmup ping reduces first-call median by ~33%, worst-case by ~58%, collapses variance from 11.76s to 1.46s. User-perceived wall time on CloudFront is roughly Lambda REPORT + 500–1500ms for edge hops and frontend render, so real first-call UX was approximately 6–8s. Updated 2026-04-19: index cache priming in the warmup branch (Warmup Hardening, commit `87e1e21`) eliminated the ~6s S3-load penalty on first touch — first-call Lambda is now ~4.7s, wall time ~5–6s.
 
 Caveat: one pre-warmup result at 3.10s suggests Nebius's endpoint is occasionally warm from other customer traffic. The ping doesn't create warmth that didn't exist — it makes reliable what was previously lucky.
 
@@ -673,6 +673,34 @@ Three-panel analyst console — not a chatbot, not a form.
 - Read last session wrap-up before starting
 - Write session wrap-up to `sessions/YYYY-MM-DD-wrap.md` at end of every session
 - Never end a session without a wrap-up file
+
+---
+
+## Warmup Hardening ✅ Complete (2026-04-19) | commit `87e1e21`
+
+### Root Cause (discovered via CloudWatch diagnosis, 2026-04-19)
+
+**Problem 1 — Index cache not primed by warmup:** The warmup branch short-circuited before `_load_index()` was called. Every Lambda container spawned by a warmup ping had `_index_cache = None`. The first real user query on that container paid a ~6s S3 load penalty (58MB JSON parse). Warmup kept the container alive but did not populate the index. Measured: first-touch cold was 8.3s Lambda before fix; `[INFO] Loaded vector index from S3: 2027 chunks` confirmed in that invocation's logs.
+
+**Problem 2 — SambaNova TLS hang at 20s timeout:** SambaNova's endpoint was hanging at the TCP/TLS layer on ~50% of warmup cycles (alternating with fast 429s from rate-limit exhaustion). With `timeout=20`, these warmup invocations produced ~20s REPORT durations — breaching the 12s p95 alarm threshold. Log evidence: `[WARNING] SambaNova warmup failed: <urlopen error _ssl.c:993: The handshake operation timed out>`.
+
+### Fixes (`src/lambdas/query/handler.py`, warmup branch)
+
+**Fix 1 — Index cache priming:** Added `_load_index()` call in the warmup branch, before `_warmup_sambanova()`. Populates `_index_cache` on the container serving the warmup ping. Subsequent warmup pings on the same container hit the cache instantly. New log markers: `[INFO] Warmup: index cache primed (2027 chunks)` on success, `[WARNING] Warmup: index load failed, first user query will pay cold cost` on failure.
+
+**Fix 2 — 3s SambaNova timeout:** Lowered `urllib.request.urlopen(req, timeout=20)` → `timeout=3`. Catches TLS hangs, slow 429s, and any TCP-layer stall. A warmup ping that can't respond in 3s provides no endpoint-warming value.
+
+### Measured Results (4-cycle post-deploy CloudWatch window)
+
+| Warmup failure type | Pre-fix REPORT | Post-fix REPORT |
+|---|---|---|
+| TLS handshake timeout | ~20,000ms | ~3,079ms |
+| Cold container + 429 | ~18,000ms | ~3,976ms |
+| Fast 429 (warm, cached index) | ~250ms | ~250ms |
+
+No warmup exceeded 12s. p95 alarm remained OK throughout.
+
+**First-touch cold (incognito browser test):** 4.7s Lambda REPORT, `[INFO] Using cached vector index: 2027 chunks` confirmed — cache hit, no S3 load. Down from 8.3s before fix.
 
 ---
 

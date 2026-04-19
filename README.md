@@ -28,7 +28,7 @@ Documents land in `data/documents/` or `data/well-architected/` → `scripts/ing
 `POST /query` hits API Gateway → query Lambda embeds the question → cosine similarity returns top-5 chunks across both KBs → router branches on `selected_engine`: Bedrock path builds an Anthropic Messages API request to Claude Haiku 4.5 (via cross-region inference profile), SambaNova path fetches the API key from SSM and builds an OpenAI-compatible request to Llama 3.3-70B → answer streams back through CloudFront → frontend renders the answer plus the retrieved chunks in an evidence panel with relevance scores and KB badges.
 
 **Warm-up:**
-EventBridge fires every 5 minutes with `{"warmup": true}`. The Lambda handler short-circuits on that payload, makes a 1-token synthetic call to SambaNova to keep their inference endpoint warm, then returns in under 2 seconds. The prior Nebius warmup was prone to 20-second timeouts that triggered p95 alarms — the SambaNova warmup completes in ~631ms. Runs about $0.03/month.
+EventBridge fires every 5 minutes with `{"warmup": true}`. The warmup ping does three things: keeps the Lambda container alive, pre-populates the S3 vector index into the module-level `_index_cache` (eliminating a ~6s S3-load penalty on the container's first real query), and fires a 1-token synthetic call to SambaNova at a 3-second timeout to keep their inference endpoint warm. Warmup REPORT duration: ~250ms on containers with a cached index, up to ~4s on cold containers. Runs about $0.03/month.
 
 ---
 
@@ -41,7 +41,7 @@ EventBridge fires every 5 minutes with `{"warmup": true}`. The Lambda handler sh
 | Amazon API Gateway | HTTPS endpoint for the query Lambda |
 | Amazon Bedrock — Titan Embeddings v2 | Text-to-vector for documents and queries |
 | Amazon Bedrock — Claude Haiku 4.5 | Generation Provider A (via cross-region inference profile, ~3–8s warm) |
-| SambaNova — Llama 3.3-70B | Generation Provider B (OpenAI-compatible API, ~2.5–5s warm, ~5–6s first-call-after-idle) |
+| SambaNova — Llama 3.3-70B | Generation Provider B (OpenAI-compatible API, ~2.5–5s warm; first-touch cold ~4.7s Lambda with index cache pre-warmed by EventBridge ping) |
 | Amazon CloudFront | HTTPS edge distribution for the frontend |
 | AWS CloudFormation | All infrastructure as code — 665-line single template |
 | Amazon CloudWatch | Logs, dashboard, alarms on error rate and p95 duration |
@@ -99,13 +99,16 @@ Claude Haiku responds to Anthropic's XML-style system/user structure; Llama resp
 Running top-k=3 against a 2,027-chunk index missed enumeration chunks that scored 0.40+ but got outranked by narrative chunks sharing query vocabulary. Raising to 5 added ~650ms of context processing and fixed the "What projects has Jimmy built?" incomplete-answer problem on both providers.
 
 **Provider B swap: Nebius → SambaNova.**
-Nebius AI Studio (Llama 3.3-70B) was the original Provider B. A 1-token synthetic warmup ping reduced first-call median from ~8s to ~5.5s, but p95 alarms kept firing because the Nebius warmup itself timed out at 20 seconds — breaching the 12s p95 alarm threshold. Groq was evaluated but rejected (Llama 3.3-70B not available on free tier without waitlist). SambaNova runs the same model, warmup completes in ~631ms, and first-call latency matches Bedrock at ~5s. The swap fixed the reliability problem; Bedrock remains the default provider because it produces ~2-3x longer biographical answers with more specific citations from retrieved context. Runs about $0.03/month.
+Nebius AI Studio (Llama 3.3-70B) was the original Provider B. A 1-token synthetic warmup ping reduced first-call median from ~8s to ~5.5s, but p95 alarms kept firing because the Nebius warmup itself timed out at 20 seconds — breaching the 12s p95 alarm threshold. Groq was evaluated but rejected (Llama 3.3-70B not available on free tier without waitlist). SambaNova runs the same model, and the swap fixed the reliability problem. Bedrock remains the default provider because it produces ~2-3x longer biographical answers with more specific citations from retrieved context. Two subsequent warmup fixes (2026-04-19) addressed residual p95 issues: index cache priming and a 3s SambaNova timeout — see Warmup Design below. Runs about $0.03/month.
 
 **$20/month budget cap, hard.**
 Budgets alarms at $15 and $18. Actual monthly cost at portfolio traffic runs in single-digit dollars. Every latency lever is sized against this ceiling — no provisioned throughput, no dedicated endpoints, no premium inference tiers that can't justify their delta at demo volume.
 
 **Graceful rate-limit handling.**
 SambaNova's free tier enforces burst rate limits (240 RPM). Rather than surfacing a generic 500 when SambaNova returns 429, the Lambda detects the rate-limit response, logs retry-after and remaining-quota headers for diagnostics, and returns HTTP 200 with `{"error_type": "rate_limit", ...}` in the body. The frontend renders a dedicated "Rate Limited" card directing the user to switch to Bedrock. Production-style graceful degradation instead of a confusing API error.
+
+**Warmup does three things, not one.**
+The EventBridge ping keeps the Lambda container alive — that's the obvious function. Two further functions were added after diagnosing real failure modes in production. First, the warmup branch now calls `_load_index()` to pre-populate the module-level `_index_cache` — every container spawned by a warmup ping has the 58MB index ready before the first real user query, eliminating the ~6s S3-load penalty that previously hit every container's first touch. Second, the SambaNova synthetic ping uses a 3-second timeout. The original 20-second timeout caused warmup invocations to run to ~20s when SambaNova hung at TLS handshake — breaching the 12s p95 alarm threshold on every TLS-hang cycle. At 3 seconds, a warmup ping that can't connect fast-fails instead of hanging. Measured impact: first-touch cold dropped from ~8.3s Lambda (6s S3 load + ~2s Bedrock) to ~4.7s Lambda (cache hit + ~4s Bedrock). Worst-case warmup REPORT is now ~4s — well inside the 12s alarm threshold.
 
 ---
 
@@ -127,7 +130,7 @@ Hard cap enforced at $20 via AWS Budgets. See `docs/COST_GUARDRAILS.md`.
 
 ## Current Status
 
-`v1.0-multikb` tagged. Both providers live. Dual-KB retrieval operational. Mobile responsive. EventBridge and SambaNova warm-up pings running. Full deployment history in `PROJECT_PLANNING_MULTICLOUD.md`.
+`v1.1-sambanova` tagged. Both providers live. Dual-KB retrieval operational. Mobile responsive. EventBridge warmup running with index cache priming and 3-second SambaNova timeout — first-touch cold ~4.7s Lambda. Full deployment history in `PROJECT_PLANNING_MULTICLOUD.md`.
 
 Active work is tracked in the "Phase 9 Candidates" section of the planning doc — current items include index format optimization (JSON→NumPy binary), ingest pipeline path normalization, and response streaming to the frontend.
 
