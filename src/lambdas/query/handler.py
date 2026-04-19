@@ -49,6 +49,14 @@ def lambda_handler(event, context):
     # Warm-up ping from EventBridge
     if event.get("warmup"):
         print("[INFO] Warm-up ping received — container is warm")
+        try:
+            idx = _load_index()
+            if idx is not None:
+                print(f"[INFO] Warmup: index cache primed ({len(idx)} chunks)")
+            else:
+                print("[WARNING] Warmup: index load failed, first user query will pay cold cost")
+        except Exception as e:
+            print(f"[WARNING] Warmup: index load failed, first user query will pay cold cost")
         _warmup_sambanova()
         return {
             "statusCode": 200,
@@ -340,7 +348,7 @@ def _warmup_sambanova() -> None:
         )
 
         t0 = time.time()
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=3) as resp:
             resp.read()
         duration_ms = round((time.time() - t0) * 1000)
         print(f"[INFO] SambaNova warmup: duration_ms={duration_ms} status=ok")

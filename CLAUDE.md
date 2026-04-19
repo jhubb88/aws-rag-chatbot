@@ -72,6 +72,9 @@ These rules apply to every Claude Code session in this project without exception
 ### CloudFront Invalidation — Distribution EN88LEBW14923 (RAG Chatbot)
 Always use `/*` as the invalidation path on this distribution. Invalidating `/index.html` alone does not reliably clear the cache — the live URL resolves through a different internal path. Verified 2026-04-19: `/index.html` invalidation completed successfully but the live site continued serving stale HTML; `/*` cleared it immediately.
 
+### SambaNova Warmup Ping Timeout
+Set to 3s. If WARNING logs appear on warmup pings during normal SambaNova operation (not rate-limited), consider raising to 5s. The 12s alarm threshold has ~3s headroom against worst-case cold container + SambaNova timeout.
+
 ## Known Retrieval Issues
 
 ### "What projects has Jimmy built?" — retrieval miss (2026-04-18)
