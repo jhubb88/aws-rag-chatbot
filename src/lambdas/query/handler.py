@@ -105,6 +105,14 @@ def lambda_handler(event, context):
     else:
         answer, engine_used = _generate_bedrock(query, top_chunks)
 
+    # Sentinel from _generate_sambanova on 429 — keep string in sync
+    if engine_used == "sambanova_rate_limited":
+        return _build_response(200, {
+            "error_type": "rate_limit",
+            "message": "SambaNova is temporarily rate limited. Try Bedrock instead, or retry in a moment.",
+            "engine_used": None,
+        })
+
     if answer is None:
         return _build_response(500, {"error": f"Generation failed on engine: {selected_engine}"})
 
@@ -280,6 +288,12 @@ def _generate_sambanova(query, chunks):
         return answer, "sambanova"
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
+        if e.code == 429:
+            retry_after = e.headers.get("retry-after") or e.headers.get("Retry-After") or "unknown"
+            remaining   = e.headers.get("x-ratelimit-remaining") or e.headers.get("X-RateLimit-Remaining") or "unknown"
+            reset       = e.headers.get("x-ratelimit-reset") or e.headers.get("X-RateLimit-Reset") or "unknown"
+            print(f"[WARNING] SambaNova rate limited (429): retry-after={retry_after} remaining={remaining} reset={reset}")
+            return None, "sambanova_rate_limited"  # Sentinel value caught by lambda_handler — keep string in sync
         print(f"[ERROR] SambaNova HTTP error {e.code}: {body}")
         return None, None
     except Exception as e:

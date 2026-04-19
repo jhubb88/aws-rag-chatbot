@@ -40,8 +40,8 @@ EventBridge fires every 5 minutes with `{"warmup": true}`. The Lambda handler sh
 | AWS Lambda (×2) | Ingest pipeline (Python 3.12, 512MB) and query router (Python 3.12, 1024MB) |
 | Amazon API Gateway | HTTPS endpoint for the query Lambda |
 | Amazon Bedrock — Titan Embeddings v2 | Text-to-vector for documents and queries |
-| Amazon Bedrock — Claude Haiku 4.5 | Generation Provider A (via cross-region inference profile) |
-| SambaNova — Llama 3.3-70B | Generation Provider B (OpenAI-compatible API, ~2.5–5s latency) |
+| Amazon Bedrock — Claude Haiku 4.5 | Generation Provider A (via cross-region inference profile, ~3–8s warm) |
+| SambaNova — Llama 3.3-70B | Generation Provider B (OpenAI-compatible API, ~2.5–5s warm, ~5–6s first-call-after-idle) |
 | Amazon CloudFront | HTTPS edge distribution for the frontend |
 | AWS CloudFormation | All infrastructure as code — 665-line single template |
 | Amazon CloudWatch | Logs, dashboard, alarms on error rate and p95 duration |

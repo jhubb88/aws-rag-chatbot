@@ -492,6 +492,9 @@ Curated files have inconsistent `source_file` prefixes in the index (`curated/<n
 ### Curated Content: SambaNova Swap Narrative — Phase 9 Candidate
 Rewrite the Nebius→SambaNova swap narrative in `data/curated/about_jimmy.txt` with the actual decision rationale (latency alarm breaches, 20s timeouts, SambaNova free-tier selection, Groq rejection) rather than a mechanical name swap. Follows the Curated Content Rewrite Pattern from Phase 9. Source quality drives answer quality — a well-structured rationale chunk would let the model produce a recruiter-facing narrative about provider decisions without prompt gymnastics.
 
+### Bedrock Graceful Rate-Limit Handling — Phase 10 Candidate
+`_generate_bedrock` returns generic 500 on `ThrottlingException`. Add the same sentinel-value pattern used for SambaNova: catch `ThrottlingException` specifically, return `(None, "bedrock_throttled")`, and have `lambda_handler` return HTTP 200 with `{"error_type": "rate_limit", "message": "Bedrock is temporarily throttled. Try SambaNova instead, or retry in a moment."}`. Low priority — Bedrock rarely throttles at portfolio demo volume. Front-end `appendRateLimitCard` already handles `error_type: "rate_limit"` generically, so no frontend change required.
+
 ### Retrieval Miss on Projects List Query — Diagnosis (2026-04-18)
 **Status: ✅ Resolved 2026-04-18, commit `b30b6ab` — TOP_K raised 3→5. See "Retrieval Fix + Content Drift" below.**
 

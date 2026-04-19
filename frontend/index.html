@@ -1129,6 +1129,9 @@
       if (errorMsg) {
         appendErrorCard(errorMsg);
         resetSources();
+      } else if (data && data.error_type === 'rate_limit') {
+        appendRateLimitCard(data.message);
+        resetSources();
       } else {
         appendAnswerCard(data, engine);
         renderSources(data.sources || []);
@@ -1244,6 +1247,17 @@
       card.innerHTML = `
         <div class="card__label card__label--error">Error</div>
         <div class="card__text">${escHtml(message)}</div>
+      `;
+      appendToThread(card);
+    }
+
+    function appendRateLimitCard(message) {
+      const card = document.createElement('div');
+      card.className = 'card card--error';
+      card.innerHTML = `
+        <div class="card__label card__label--error">Rate Limited</div>
+        <div class="card__text">${escHtml(message)}</div>
+        <div class="card__meta">Switch to <strong>AWS Bedrock</strong> using the provider selector above, then retry your question.</div>
       `;
       appendToThread(card);
     }
