@@ -1,5 +1,5 @@
 # CLAUDE.md — RAG Chatbot Global Rules
-Last updated: 2026-04-18
+Last updated: 2026-04-19
 
 These rules apply to every Claude Code session in this project without exception.
 
@@ -26,8 +26,10 @@ These rules apply to every Claude Code session in this project without exception
 - Never force push without explicit confirmation from Jimmy
 - Never batch or deliver CC prompts ahead of time — one at a time, only when needed
 - When retrieval returns an answer that contradicts known source content, the first diagnostic step is to inspect top-K retrieved chunks AND their full ranking in CloudWatch logs or via direct index query — not to rewrite the source file. Source rewrites are a downstream fix; retrieval diagnosis comes first.
-- Nebius warmup ping in query Lambda's warmup branch is permanent. Do not remove or alter without explicit approval. Ground truth log lines `[INFO] Nebius warmup: duration_ms=X status=ok` and `[WARNING] Nebius warmup failed: <error>` are also permanent.
-- Nebius Fast tier not available for Llama 3.3-70B as of 2026-04-18.
+- SambaNova warmup ping in query Lambda's warmup branch is permanent. Do not remove or alter without explicit approval. Ground truth log lines `[INFO] SambaNova warmup: duration_ms=X status=ok` and `[WARNING] SambaNova warmup failed: <error>` are also permanent.
+- To force Lambda index cache refresh after ingest, bump the `INDEX_CACHE_VERSION` env var (e.g., 1→2) via `aws lambda update-function-configuration`. No code change needed. Keep this env var permanently — do not remove it.
+- SambaNova free tier rate limits: 240 RPM, 48K requests/day. No provisioned throughput required at portfolio demo volume.
+- Flag any approach to autonomous edits (even small ones) before applying — stop and confirm between steps, no exceptions.
 
 ## Portfolio Context
 - The portfolio-wide infrastructure reference lives at:
@@ -48,20 +50,10 @@ These rules apply to every Claude Code session in this project without exception
 - Never end a session without a wrap-up file
 - Wrap-up must include: what was completed, what was skipped, errors hit, and exact next steps
 
-## Bedrock (Active Blocker)
-- Bedrock model access is blocked at the account level — AWS Support case is open
-- Do not attempt to invoke any Bedrock generation model (Claude 3 Haiku) until Jimmy confirms it is unblocked
-- Bedrock Titan Embeddings v2 may be used for embeddings once Phase 2 begins
-- Test command when Bedrock is resolved:
-  cat > /tmp/bt.json << 'EOF'
-  {"anthropic_version":"bedrock-2023-05-31","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}
-  EOF
-  aws bedrock-runtime invoke-model \
-    --model-id anthropic.claude-3-haiku-20240307-v1:0 \
-    --body fileb:///tmp/bt.json \
-    --profile portfolio-user \
-    --region us-east-1 \
-    /tmp/bo.json && cat /tmp/bo.json
+## Bedrock
+- Bedrock is fully operational as of 2026-04-19. Claude Haiku 4.5 is the active Provider A model.
+- Model ID: `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile)
+- Bedrock Titan Embeddings v2 is active for all query and ingest embeddings.
 
 ## Local Paths
 - This project: /mnt/c/Users/jimmy/Desktop/Projects/rag-chatbot/
@@ -72,7 +64,8 @@ These rules apply to every Claude Code session in this project without exception
 - Region: us-east-1
 - Account ID: 603509861186
 - AWS CLI profile: portfolio-user
-- SSM Nebius API key path: /rag-chatbot/nebius-api-key (already exists — do not overwrite)
+- SSM SambaNova API key path: /rag-chatbot/sambanova-api-key (active — do not overwrite)
+- SSM Nebius API key path: /rag-chatbot/nebius-api-key (dormant rollback key — do not delete before 2026-05-19)
 
 ## Known Retrieval Issues
 
@@ -80,7 +73,7 @@ These rules apply to every Claude Code session in this project without exception
 **Query:** "What projects has Jimmy built?"
 **Symptom:** Both providers hedge with "context doesn't provide details about other specific projects" despite the answer existing in three index chunks. The cleanest chunk (project_index.txt, 345 chars) scored 0.4179 and ranked 5th overall — missing the top-3 cutoff by 0.0329.
 **Root cause:** top_k=3 is too aggressive for a 2,027-chunk index. Narrative career chunks outrank enumeration chunks due to vocabulary overlap with "built / projects / Jimmy." The index content is correct; the cutoff is too tight.
-**Status:** resolved 2026-04-18 commit b30b6ab — TOP_K raised 3→5, both providers now name all 7 projects. Nebius first-call-after-idle latency (true baseline: min 3.10s, median 8.25s, max 14.86s from CloudWatch REPORT — prior "10–18s" estimate was eyeball, not data) is a Nebius-side characteristic, not related to this fix. Warmup ping (commit b36c69c) reduces first-call median by ~33%, worst-case by ~58%.
+**Status:** resolved 2026-04-18 commit b30b6ab — TOP_K raised 3→5, both providers now name all 7 projects. SambaNova (replacing Nebius 2026-04-19) first-call-after-idle latency: ~2.5s median with warmup ping active. Warmup ping (commit b36c69c, updated for SambaNova) completes in ~631ms — resolves p95 alarm that Nebius's 20s warmup timeout was triggering.
 
 ## README Maintenance Rule
 
@@ -88,7 +81,7 @@ README.md is a living document and must be kept current as code and infrastructu
 
 Triggers that require README.md updates:
 - Model change (either provider) — update Tech Stack table, Architecture section, Engineering Decisions if the change is load-bearing
-- Provider change (switching Nebius to Groq/Together/etc., or adding a third provider) — update all references including the opening paragraph
+- Provider change (switching SambaNova to Groq/Together/etc., or adding a third provider) — update all references including the opening paragraph
 - New AWS service added or removed from the stack — update Tech Stack table
 - New KB added or KB scope changed — update What This Project Is, Architecture, Engineering Decisions
 - New latency lever shipped (streaming, index format change, etc.) — update Engineering Decisions

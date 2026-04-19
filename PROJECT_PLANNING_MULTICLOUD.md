@@ -1,5 +1,5 @@
 # RAG Knowledge Chatbot — Project Planning Document
-### Multi-Cloud Edition | Last Updated: 2026-04-17
+### Multi-Cloud Edition | Last Updated: 2026-04-19
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 **Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
@@ -11,13 +11,11 @@
 **Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `f872fc0`, tag `v1.0-multikb`
 **Phase 8.5 Status:** ✅ Complete — mobile responsive layout, iPhone Safari bugs resolved, commit `ba601b5` (no new tag — v1.0-multikb stands)
 
-> **Next session (2026-04-18 → 2026-04-19):** Nebius AI Studio provider will be swapped to SambaNova. Decision made 2026-04-18. See Phase 9 Candidates → Nebius Provider Swap for details. All Nebius references in this doc remain accurate until the swap is deployed.
-
 ---
 
 ## What This Project Is
 
-A serverless Retrieval-Augmented Generation (RAG) chatbot built on AWS, enhanced with a **Multi-Cloud Dual-Provider AI architecture**. Users ask plain English questions and get answers grounded in real documents — resume, project writeups, technical references. It uses a custom retrieval layer, not Bedrock Knowledge Bases. The live demo features a real-time UI toggle between AWS Bedrock (Claude) and Nebius AI Studio (Llama).
+A serverless Retrieval-Augmented Generation (RAG) chatbot built on AWS, enhanced with a **Multi-Cloud Dual-Provider AI architecture**. Users ask plain English questions and get answers grounded in real documents — resume, project writeups, technical references. It uses a custom retrieval layer, not Bedrock Knowledge Bases. The live demo features a real-time UI toggle between AWS Bedrock (Claude) and SambaNova (Llama).
 
 **Portfolio page:** http://jimmy-advanced-projects.s3-website-us-east-1.amazonaws.com  
 **GitHub repo:** https://github.com/jhubb88/aws-rag-chatbot
@@ -28,7 +26,7 @@ A serverless Retrieval-Augmented Generation (RAG) chatbot built on AWS, enhanced
 
 - Build a recruiter-friendly, advanced portfolio project on AWS
 - Demonstrate end-to-end serverless architecture
-- **Showcase Multi-Cloud API routing and AI provider abstraction (AWS Bedrock vs Nebius AI Studio)**
+- **Showcase Multi-Cloud API routing and AI provider abstraction (AWS Bedrock vs SambaNova)**
 - Show responsible cost management
 - Produce clean, readable infrastructure as code
 - Keep monthly cost under $20
@@ -50,12 +48,12 @@ us-east-1 — best Bedrock model availability and lowest latency for demos.
 | API Gateway | Public HTTPS endpoint for query Lambda | Pay-per-request, essentially free at demo scale |
 | Bedrock — Titan Embeddings v2 | Convert text to vectors | AWS-native, instantly approved, no third-party keys |
 | **AWS Bedrock — Claude 3 Haiku** | **Generation Provider A** | Fast, enterprise-grade, requires specific XML prompting |
-| **Nebius AI Studio — Llama 3.3-70B** | **Generation Provider B** | OpenAI-compatible, bypasses AWS auth blocks, uses Markdown prompting |
+| **SambaNova — Llama 3.3-70B** | **Generation Provider B** | OpenAI-compatible, sub-1s TTFT, free tier 240 RPM/48K req/day |
 | CloudFormation | Infrastructure as code | Recruiter value, prevents drift |
 | CloudWatch | Logging and dashboards | Required for observability |
 | CloudTrail | Audit logging | Shows ops maturity |
 | AWS Budgets | Cost alerts | $15 alert ✅, $18 alert ✅, $20 hard cap |
-| AWS Systems Manager (SSM) | Store Nebius API Key | Secure secret management for external APIs |
+| AWS Systems Manager (SSM) | Store SambaNova API Key | Secure secret management for external APIs |
 
 ### Excluded from MVP
 
@@ -76,9 +74,9 @@ NOT using Bedrock Knowledge Bases. Using a custom retrieval layer:
 
 ### Multi-Provider Generation Decision
 The Query Lambda acts as a **Router**:
-- The frontend passes `selected_engine` (bedrock or nebius)
+- The frontend passes `selected_engine` (bedrock or sambanova)
 - If bedrock: Lambda loads the Claude XML template and uses `boto3` to invoke Claude 3 Haiku
-- If nebius: Lambda loads the Llama Markdown template, fetches the Nebius API key from SSM, and makes a standard HTTP request to Nebius AI Studio
+- If sambanova: Lambda loads the Llama Markdown template, fetches the SambaNova API key from SSM, and makes a standard HTTP request to SambaNova
 
 ### IaC Decision
 CloudFormation included in MVP:
@@ -98,7 +96,7 @@ Real 1536-dim vectors confirmed from `amazon.titan-embed-text-v2:0`.
 ### Bedrock Generation — ✅ FULLY OPERATIONAL (2026-04-16)
 Model migrated to `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile) during Phase 5.
 Smoke test confirmed: `engine_used: bedrock` — real answer returned from Claude Haiku 4.5.
-Both AI providers (Bedrock Claude Haiku 4.5 + Nebius Llama 3.3-70B) are now fully operational.
+Both AI providers (Bedrock Claude Haiku 4.5 + SambaNova Llama 3.3-70B) are now fully operational.
 
 ### Retrieval Quality — ✅ RESOLVED (2026-04-16)
 Chunk size reduced from 500 to 175 words (overlap 50→20). Four curated knowledge files
@@ -377,6 +375,46 @@ Speed delta Bedrock (3–5s) vs Nebius (3–9s) is intentional — visible contr
 
 ---
 
+## SambaNova Provider Swap ✅ Complete (2026-04-19) | commit `<hash-pending>`
+
+**Decision rationale:** Nebius Base tier (Llama 3.3-70B) was the latency bottleneck — warm 3–9s, first-call-after-idle 5.5s median despite warmup pings. The p95 alarm (`rag-chatbot-p95-duration-dev`) was firing repeatedly, confirmed on 2026-04-19 12:30 UTC: the 20,299ms breach was 100% Nebius warmup timeout (20s read timeout), zero Bedrock involvement. Alarm log: `[WARNING] Nebius warmup failed: The read operation timed out`.
+
+**Provider selected: SambaNova.** Model: `Meta-Llama-3.3-70B-Instruct` (exact casing required — Nebius used `meta-llama/Llama-3.3-70B-Instruct`, different casing and org prefix). Endpoint: `https://api.sambanova.ai/v1/chat/completions`. Auth: bearer token in SSM at `/rag-chatbot/sambanova-api-key`.
+
+**Groq rejected:** 12K TPM free tier cap would trigger 429s during a recruiter demo at ~1,050 tokens/query average (~11 queries before rate limit). Not viable for demo use.
+
+**Cost delta:** Nebius Base $0.13/$0.40 per M tokens → SambaNova $0.60/$1.20. Monthly impact ~$0.30–0.50 at demo volume, within $20 cap. Free tier: 240 RPM, 48K requests/day, no credit card required.
+
+**Dormant Nebius key:** `/rag-chatbot/nebius-api-key` left in SSM as rollback asset. Do not delete before 2026-05-19.
+
+**Warm performance (Step 7 validation, 2026-04-19):**
+
+| Query | Engine | Wall time | Lambda duration | completion_tokens | finish_reason |
+|---|---|---|---|---|---|
+| Why should I hire Jimmy? | Bedrock | 8,311ms | 8,034ms | 274 output | end_turn |
+| Why should I hire Jimmy? | SambaNova | 4,845ms | 4,439ms | 97 | stop |
+| What is the NTCIP simulator? | SambaNova | 3,582ms | 3,095ms | 149 | stop |
+| Six pillars of Well-Architected? | SambaNova | 2,784ms | 2,517ms | 31 | stop |
+
+**First-call-after-idle (Steps 8 + 8b, with warmup pings running):**
+
+| Provider | Wall time | Lambda duration |
+|---|---|---|
+| SambaNova | 5,656ms | 5,259ms |
+| Bedrock | 4,858ms | 4,438ms |
+
+SambaNova warm: 2.5–4.4s Lambda — **clear improvement over Nebius 3–9s**. First-call matches Nebius post-warmup median (5.52s) — warmup ping equally effective for both providers.
+
+**Warmup ping:** Cycle 1 post-deploy returned HTTP 500 (transient — SambaNova free-tier spin-up on first hit). Cycle 2: `duration_ms=631 status=ok`. 631ms vs Nebius 2,146ms on a healthy cycle; Nebius was timing out at 20s on unhealthy cycles. No more p95 alarm breaches expected from warmup path.
+
+**Answer quality finding:** SambaNova handles technical/factual queries well (NTCIP, six pillars, AWS services). Biographical synthesis (Why hire Jimmy?) defaults to category descriptions rather than proper nouns (Air Force appears; Kapsch, Secret clearance, specific AWS services do not) despite two system prompt instruction attempts. Retrieval confirmed correct — all 5 top chunks from `about_jimmy.txt`, which contains all specific facts. Structural ceiling of Llama 3.3-70B for biographical tasks. **Bedrock stays default provider permanently.** SambaNova's value is speed on factual queries; the provider toggle remains meaningful as a speed-vs-depth tradeoff demo.
+
+**System prompt change:** One instruction added: *"When answering questions about Jimmy's background, cite specific proper nouns from the context — employer names, specific technologies, certifications, and credentials by name — do not paraphrase them into generic descriptions."* Partially effective (Air Force name appeared), not sufficient to force Kapsch/clearance/AWS specifics. This is the final system prompt iteration per hard gate — no further tuning.
+
+**KB re-ingest (Step 8.5):** `data/curated/about_jimmy.txt` and `data/curated/project_summary.txt` updated — Nebius → SambaNova references. Re-ingest revealed an ingest pipeline path normalization bug: curated files were indexed under `curated/<name>` prefix but re-ingested as `<name>`, so old stale entries were not removed. Fixed by manual index surgery (filter + re-upload). Index restored to 2,027 chunks. Backup at `documents/index.json.bak-sambanova-swap`. `INDEX_CACHE_VERSION=1` Lambda env var added to force container cache invalidation after re-ingest — bump this value any time re-ingest is run.
+
+---
+
 ## Phase 9 Candidates
 
 ### Parked Latency Levers (ranked by impact)
@@ -418,16 +456,16 @@ Added `[DEBUG] Bedrock request: model=... max_tokens=256` before `invoke_model` 
 
 Bedrock warm baseline: **2.8–4.9s**. Nebius warm baseline: **3–9s** (unchanged from Phase 8). Frontend end-to-end test (8 queries, both providers via CloudFront): all pass, no truncation, no errors.
 
-### Nebius System Prompt Tuning ✅ Complete (2026-04-17) | commit `25d4c7d`
-**Problem:** Post-content-rewrite testing revealed two Nebius answer quality issues: (1) Llama was leading answers with "According to the context" or "Based on the provided information" — a robotic tic that reads poorly in a recruiter-facing demo. (2) Answers closely echoed the source text verbatim rather than synthesizing across chunks.
+### SambaNova/Llama System Prompt Tuning ✅ Complete (2026-04-17) | commit `25d4c7d`
+**Problem:** Post-content-rewrite testing revealed two Llama answer quality issues (originally on Nebius, prompt carries over to SambaNova — same model): (1) Llama was leading answers with "According to the context" or "Based on the provided information" — a robotic tic that reads poorly in a recruiter-facing demo. (2) Answers closely echoed the source text verbatim rather than synthesizing across chunks.
 
-**Fix — two instructions added to Nebius system prompt:**
+**Fix — two instructions added to SambaNova system prompt:**
 1. *"Never say 'according to the context', 'based on the provided information', or similar phrases — answer directly as if the information is your own knowledge."*
 2. *"Write in your own words and voice, combining facts from multiple context chunks into a flowing answer. Do not structure your answer as bullet points or sectioned lists unless the question genuinely requires them."*
 
 Note: "Do not closely paraphrase the source text" was explicitly rejected — risks Llama dropping specific facts (8 years, Air Force, Staff Engineer level) that feel like direct quotes but are factual grounding we want preserved.
 
-Both providers now have instruction-tuned system prompts. Bedrock tuned for concision and structure (2026-04-17, commit `4768755`); Nebius tuned for natural voice and synthesis (2026-04-17, commit `25d4c7d`).
+Both providers now have instruction-tuned system prompts. Bedrock tuned for concision and structure (2026-04-17, commit `4768755`); SambaNova (Llama) tuned for natural voice and synthesis (2026-04-17, commit `25d4c7d`).
 
 **Validation (2 queries post-deploy, warm container):**
 
@@ -447,6 +485,12 @@ Both providers now have instruction-tuned system prompts. Bedrock tuned for conc
 
 ### Query Vocabulary Gap
 Open-ended recruiter queries like "what should I look at first" score below 0.40 because curated content uses comparative vocabulary (impressive, flagship) rather than entry-point vocabulary (start with, look at first). Fix: query rewriting at the Lambda layer, not content patches.
+
+### Ingest Pipeline Path Normalization — Phase 9 Candidate
+Curated files have inconsistent `source_file` prefixes in the index (`curated/<name>` vs `<name>`), causing re-ingest replacement to miss existing entries — old stale chunks remain and new chunks are added on top. Incident: 2026-04-19 SambaNova swap re-ingest produced 2,036 chunks instead of 2,027; required manual index surgery. Fix: normalize all `source_file` values to a single convention (basename only, no path prefix) in the ingest Lambda before write. Low priority — only triggers on curated file re-ingest.
+
+### Curated Content: SambaNova Swap Narrative — Phase 9 Candidate
+Rewrite the Nebius→SambaNova swap narrative in `data/curated/about_jimmy.txt` with the actual decision rationale (latency alarm breaches, 20s timeouts, SambaNova free-tier selection, Groq rejection) rather than a mechanical name swap. Follows the Curated Content Rewrite Pattern from Phase 9. Source quality drives answer quality — a well-structured rationale chunk would let the model produce a recruiter-facing narrative about provider decisions without prompt gymnastics.
 
 ### Retrieval Miss on Projects List Query — Diagnosis (2026-04-18)
 **Status: ✅ Resolved 2026-04-18, commit `b30b6ab` — TOP_K raised 3→5. See "Retrieval Fix + Content Drift" below.**
@@ -480,11 +524,11 @@ Root cause: `project_index.txt` (clean 7-project enumeration, 345 chars) scored 
 
 The "Why hire Jimmy" 3-sentence pitch rewrite from 2026-04-17 was live in the ingested index but never committed to git. HEAD was stale relative to production. No behavior change — purely git hygiene.
 
-### Nebius Warmup Ping ✅ Complete (2026-04-18) | commit `b36c69c`
+### Provider Warmup Ping ✅ Complete (2026-04-18, Nebius) | Updated 2026-04-19 (SambaNova) | commit `b36c69c`
 
-**Problem:** Nebius first-call-after-idle penalty. The Lambda container stayed warm via the existing EventBridge ping (2–3ms early return), but the Nebius inference endpoint was still going cold between real user queries. The container being warm doesn't mean the external provider's endpoint is warm.
+**Problem:** External provider first-call-after-idle penalty. The Lambda container stayed warm via the existing EventBridge ping (2–3ms early return), but the inference endpoint itself was going cold between real user queries. The container being warm doesn't mean the external provider's endpoint is warm.
 
-**Fix:** Synthetic Nebius call added to the warmup branch in `src/lambdas/query/handler.py` via new `_warmup_nebius()` helper function, called on every EventBridge warmup cycle (every 5 min). Payload: `model=meta-llama/Llama-3.3-70B-Instruct`, `messages=[{role:user, content:ping}]`, `max_tokens=1`, `temperature=0`. Wrapped in `try/except`, 20s timeout, never fails the Lambda invocation. Reuses `_get_nebius_api_key()` — no SSM logic duplicated. Bedrock has no equivalent penalty; no Bedrock warmup call was added.
+**Fix:** Synthetic provider call added to the warmup branch in `src/lambdas/query/handler.py` via `_warmup_sambanova()` (originally `_warmup_nebius()`, renamed 2026-04-19 during SambaNova swap), called on every EventBridge warmup cycle (every 5 min). Payload: `model=Meta-Llama-3.3-70B-Instruct`, `messages=[{role:user, content:ping}]`, `max_tokens=1`, `temperature=0`. Wrapped in `try/except`, 20s timeout, never fails the Lambda invocation. Bedrock has no equivalent penalty; no Bedrock warmup call was added.
 
 **Before/After (Lambda REPORT duration, first-call-after-idle):**
 
@@ -505,26 +549,12 @@ Caveat: one pre-warmup result at 3.10s suggests Nebius's endpoint is occasionall
 **Cost:** ~8,640 pings/month × ~11 tokens/ping ≈ 95K tokens/month. Well under $0.05/month at Nebius pricing.
 
 **Ground truth logging (permanent — do not remove):**
-- `[INFO] Nebius warmup: duration_ms=X status=ok` on success
-- `[WARNING] Nebius warmup failed: <error>` on failure (includes HTTP status code for HTTPError)
+- `[INFO] SambaNova warmup: duration_ms=X status=ok` on success
+- `[WARNING] SambaNova warmup failed: <error>` on failure (includes HTTP status code for HTTPError)
 
-### Nebius Provider Swap → SambaNova (decided, implementation pending)
+### Nebius Provider Swap → SambaNova ✅ Complete (2026-04-19)
 
-Decision made 2026-04-18. Research via Perplexity covered SambaNova, Groq, Cerebras, Fireworks, Together AI, and DeepInfra for Llama 3.3-70B specifically.
-
-**Selected: SambaNova.** Model: `Meta-Llama-3.3-70B-Instruct`, endpoint: `https://api.sambanova.ai/v1`, auth: bearer token in SSM.
-
-Expected outcome: Nebius warm baseline 3–9s → SambaNova sub-2s. First-call-after-idle 5.5s → sub-2s.
-
-Cost delta: Nebius Base tier $0.13/$0.40 per M tokens → SambaNova $0.60/$1.20. Still under $1/M blended. Monthly impact roughly $0.30–0.50 at demo volume, well within $20 cap.
-
-Free tier: 240 RPM, 48K requests/day, no credit card required.
-
-Groq rejected: 12K TPM free tier cap would trigger 429s during a recruiter demo at our ~1,050 tokens/query average.
-
-Implementation scope: swap `NEBIUS_ENDPOINT`, `NEBIUS_MODEL`, SSM key path; test warmup ping against new provider; validate with Nebius system prompt (already tuned for Llama); update README Tech Stack table; update About modal and subtitle in frontend.
-
-Estimated work: 45–60 min CC session including validation and docs.
+Decision made 2026-04-18, implemented 2026-04-19. See **SambaNova Provider Swap** section below for full results, metrics, and decision rationale.
 
 ---
 
@@ -536,7 +566,7 @@ All 8 steps complete. See Phase 8 Progress and Phase 8 Performance Fix subsectio
 - 2,027-chunk combined index: `jimmy_background` (43 + curated) + `aws_well_architected` (1,974)
 - EventBridge warm-up ping every 5 min — cold starts eliminated for demo use
 - Bedrock selected by default on page load
-- Warm baseline: Bedrock 3–5s, Nebius 3–9s
+- Warm baseline at v1.0: Bedrock 3–5s, Nebius 3–9s (Nebius replaced by SambaNova 2026-04-19 — see SambaNova Provider Swap section)
 - CloudFront URL: `https://d1r1qv7io7k8vk.cloudfront.net`
 
 ---
@@ -618,7 +648,7 @@ Three-panel analyst console — not a chatbot, not a form.
 - Hard cap: $20/month
 - AWS Budgets: **$15 alert configured ✅**, **$18 alert configured ✅**
 - Lambda and API Gateway: effectively free at portfolio traffic
-- **Nebius AI Studio:** Pay-per-token (fractions of a cent per query)
+- **SambaNova:** Pay-per-token ($0.60/$1.20 per M input/output tokens — ~$0.30–0.50/month at demo volume)
 - Bedrock is the primary cost driver for embeddings
 - Kill switch: disable API Gateway if budget is at risk
 

@@ -1,6 +1,6 @@
 # RAG Knowledge Chatbot
 
-A serverless Retrieval-Augmented Generation chatbot on AWS with multi-cloud dual-provider routing. Ask questions about my engineering background or the AWS Well-Architected Framework — the same query runs through either AWS Bedrock (Claude Haiku 4.5) or Nebius AI Studio (Llama 3.3-70B) based on the provider you select, so you can compare answers and latency side-by-side.
+A serverless Retrieval-Augmented Generation chatbot on AWS with multi-cloud dual-provider routing. Ask questions about my engineering background or the AWS Well-Architected Framework — the same query runs through either AWS Bedrock (Claude Haiku 4.5) or SambaNova (Llama 3.3-70B) based on the provider you select, so you can compare answers and latency side-by-side.
 
 **Live Demo:** https://d1r1qv7io7k8vk.cloudfront.net
 **Portfolio:** https://d2uisqfxjzeo6a.cloudfront.net
@@ -11,10 +11,10 @@ A serverless Retrieval-Augmented Generation chatbot on AWS with multi-cloud dual
 
 A production-style RAG system that demonstrates:
 
-- **Multi-cloud AI routing** — a single Lambda router calls either AWS Bedrock or Nebius AI Studio based on the user's selected provider, with matching retrieved context and intentionally different prompt formats per provider.
+- **Multi-cloud AI routing** — a single Lambda router calls either AWS Bedrock or SambaNova based on the user's selected provider, with matching retrieved context and intentionally different prompt formats per provider.
 - **Custom retrieval layer** — no Bedrock Knowledge Bases, no managed vector service. Documents are chunked, embedded via Bedrock Titan Embeddings v2, and stored as a combined vector index in S3. Cosine similarity runs inside the query Lambda.
 - **Two knowledge bases in one index** — Jimmy's engineering background (resume, project writeups, curated Q&A) and the full AWS Well-Architected Framework pillars. Every chunk carries a `source_kb` tag so the frontend can visually distinguish sources in the evidence panel.
-- **Real observability** — CloudWatch dashboard, alarms on error rate and p95 duration, SNS alerts, EventBridge warm-up pings against both Lambda and the Nebius inference endpoint.
+- **Real observability** — CloudWatch dashboard, alarms on error rate and p95 duration, SNS alerts, EventBridge warm-up pings against both Lambda and the SambaNova inference endpoint.
 - **Hard cost cap** — $20/month enforced via AWS Budgets alerts at $15 and $18. Actual run cost sits in single-digit dollars.
 
 ---
@@ -25,10 +25,10 @@ A production-style RAG system that demonstrates:
 Documents land in `data/documents/` or `data/well-architected/` → `scripts/ingest_bulk.py` chunks them (175 words, 20-word overlap) → each chunk is embedded via Bedrock Titan Embeddings v2 (1536-dim vectors) → the combined index is written to S3 as `documents/index.json`.
 
 **Query (every user request):**
-`POST /query` hits API Gateway → query Lambda embeds the question → cosine similarity returns top-5 chunks across both KBs → router branches on `selected_engine`: Bedrock path builds an Anthropic Messages API request to Claude Haiku 4.5 (via cross-region inference profile), Nebius path fetches the API key from SSM and builds an OpenAI-compatible request to Llama 3.3-70B → answer streams back through CloudFront → frontend renders the answer plus the retrieved chunks in an evidence panel with relevance scores and KB badges.
+`POST /query` hits API Gateway → query Lambda embeds the question → cosine similarity returns top-5 chunks across both KBs → router branches on `selected_engine`: Bedrock path builds an Anthropic Messages API request to Claude Haiku 4.5 (via cross-region inference profile), SambaNova path fetches the API key from SSM and builds an OpenAI-compatible request to Llama 3.3-70B → answer streams back through CloudFront → frontend renders the answer plus the retrieved chunks in an evidence panel with relevance scores and KB badges.
 
 **Warm-up:**
-EventBridge fires every 5 minutes with `{"warmup": true}`. The Lambda handler short-circuits on that payload, makes a 1-token synthetic call to Nebius to keep their inference endpoint warm, then returns in under 6 seconds. This eliminated a 10-15 second first-call-after-idle penalty for Nebius.
+EventBridge fires every 5 minutes with `{"warmup": true}`. The Lambda handler short-circuits on that payload, makes a 1-token synthetic call to SambaNova to keep their inference endpoint warm, then returns in under 2 seconds. The prior Nebius warmup was prone to 20-second timeouts that triggered p95 alarms — the SambaNova warmup completes in ~631ms. Runs about $0.03/month.
 
 ---
 
@@ -41,12 +41,12 @@ EventBridge fires every 5 minutes with `{"warmup": true}`. The Lambda handler sh
 | Amazon API Gateway | HTTPS endpoint for the query Lambda |
 | Amazon Bedrock — Titan Embeddings v2 | Text-to-vector for documents and queries |
 | Amazon Bedrock — Claude Haiku 4.5 | Generation Provider A (via cross-region inference profile) |
-| Nebius AI Studio — Llama 3.3-70B | Generation Provider B (OpenAI-compatible API) |
+| SambaNova — Llama 3.3-70B | Generation Provider B (OpenAI-compatible API, ~2.5–5s latency) |
 | Amazon CloudFront | HTTPS edge distribution for the frontend |
 | AWS CloudFormation | All infrastructure as code — 665-line single template |
 | Amazon CloudWatch | Logs, dashboard, alarms on error rate and p95 duration |
 | Amazon EventBridge | 5-minute warm-up ping |
-| AWS Systems Manager (SSM) | Secure storage for the Nebius API key |
+| AWS Systems Manager (SSM) | Secure storage for the SambaNova API key |
 | Amazon SNS | Alarm delivery |
 | AWS Budgets | Cost alerts at $15 and $18 against a $20/month hard cap |
 
@@ -93,13 +93,13 @@ Every chunk carries a `source_kb` tag. One cosine pass per query, merge logic is
 Initial retrieval scores for open-ended queries were under 0.30. Shrinking chunks to 175 words with 20-word overlap and adding four curated index files (project summaries, work history, highlight index) pushed all target queries above 0.40. Quality jump was immediate and dramatic.
 
 **Provider-specific prompts, not a unified prompt.**
-Claude Haiku responds to Anthropic's XML-style system/user structure; Llama responds better to Markdown-style instructions. Both system prompts are independently tuned — Bedrock for concision and structure (`max_tokens=384`), Nebius for natural voice and synthesis (`max_tokens=256`). Same context, different wrapping.
+Claude Haiku responds to Anthropic's XML-style system/user structure; Llama responds better to Markdown-style instructions. Both system prompts are independently tuned — Bedrock for concision and structure (`max_tokens=384`), SambaNova (Llama) for natural voice and synthesis (`max_tokens=256`). Same context, different wrapping.
 
 **Top-k = 5, not 3.**
 Running top-k=3 against a 2,027-chunk index missed enumeration chunks that scored 0.40+ but got outranked by narrative chunks sharing query vocabulary. Raising to 5 added ~650ms of context processing and fixed the "What projects has Jimmy built?" incomplete-answer problem on both providers.
 
-**Nebius warm-up ping.**
-The Lambda container warm-up ping (EventBridge, every 5 min) wasn't enough — Nebius's inference endpoint itself was going cold between user queries, adding 10-15 seconds to first-call latency. A 1-token synthetic Nebius call inside the warm-up branch collapsed first-call median from ~8s to ~5.5s and eliminated the 15-second tail. Runs about $0.03/month.
+**Provider B swap: Nebius → SambaNova.**
+Nebius AI Studio (Llama 3.3-70B) was the original Provider B. A 1-token synthetic warmup ping reduced first-call median from ~8s to ~5.5s, but p95 alarms kept firing because the Nebius warmup itself timed out at 20 seconds — breaching the 12s p95 alarm threshold. Groq was evaluated but rejected (Llama 3.3-70B not available on free tier without waitlist). SambaNova runs the same model, warmup completes in ~631ms, and first-call latency matches Bedrock at ~5s. The swap fixed the reliability problem; Bedrock remains the default provider because it produces ~2-3x longer biographical answers with more specific citations from retrieved context. Runs about $0.03/month.
 
 **$20/month budget cap, hard.**
 Budgets alarms at $15 and $18. Actual monthly cost at portfolio traffic runs in single-digit dollars. Every latency lever is sized against this ceiling — no provisioned throughput, no dedicated endpoints, no premium inference tiers that can't justify their delta at demo volume.
@@ -112,8 +112,7 @@ Monthly cost breakdown at portfolio demo volume (~500 queries/month):
 
 - Bedrock embeddings (Titan v2): ~$0.02
 - Bedrock generation (Claude Haiku 4.5): ~$0.95
-- Nebius generation (Llama 3.3-70B): ~$0.09
-- Nebius warmup pings: ~$0.03
+- SambaNova generation (Llama 3.3-70B): ~$0.30–0.50 (free tier, usage-based)
 - Lambda compute: under free tier
 - API Gateway: under free tier
 - S3 / CloudFront / CloudWatch: ~$0.50
@@ -125,9 +124,9 @@ Hard cap enforced at $20 via AWS Budgets. See `docs/COST_GUARDRAILS.md`.
 
 ## Current Status
 
-`v1.0-multikb` tagged. Both providers live. Dual-KB retrieval operational. Mobile responsive. EventBridge and Nebius warm-up pings running. Full deployment history in `PROJECT_PLANNING_MULTICLOUD.md`.
+`v1.0-multikb` tagged. Both providers live. Dual-KB retrieval operational. Mobile responsive. EventBridge and SambaNova warm-up pings running. Full deployment history in `PROJECT_PLANNING_MULTICLOUD.md`.
 
-Active work is tracked in the "Phase 9 Candidates" section of the planning doc — current items include index format optimization (JSON→NumPy binary), evaluating Nebius provider alternatives for latency, and response streaming to the frontend.
+Active work is tracked in the "Phase 9 Candidates" section of the planning doc — current items include index format optimization (JSON→NumPy binary), ingest pipeline path normalization, and response streaming to the frontend.
 
 ---
 
