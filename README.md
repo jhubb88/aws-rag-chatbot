@@ -134,6 +134,12 @@ Hard cap enforced at $20 via AWS Budgets. See `docs/COST_GUARDRAILS.md`.
 
 Active work is tracked in the "Phase 9 Candidates" section of the planning doc — current items include index format optimization (JSON→NumPy binary), ingest pipeline path normalization, and response streaming to the frontend.
 
+## Supported Platforms
+
+**Fully supported:** desktop browsers (Chrome, Firefox, Safari, Edge), iPhone Safari.
+
+**Known issue — iPad Safari:** After using Clear Session and running a second query, the top bar and panel controls may become unresponsive. The chat input and center panel remain functional. Workaround: reload the page. This is under investigation and deferred as low-priority (demo audience is primarily desktop).
+
 ---
 
 ## License

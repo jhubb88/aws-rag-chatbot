@@ -131,12 +131,26 @@ Cold worst-case dropped from 32,279ms → 14,860ms (~54%). Warm queries now 5–
 ### Query Vocabulary Gap (Deferred — Phase 9)
 Open-ended recruiter queries like "what should I look at first" score below the 0.40 retrieval threshold because the curated content uses comparative vocabulary (impressive, flagship, best) rather than entry-point vocabulary (start with, first thing). The right fix is query rewriting at the query Lambda layer, not additional content patches. Candidate for Phase 9.
 
-### Horizontal Scroll on Mobile — ✅ Resolved (Phase 8.6, 2026-04-19)
-**Symptom:** Tapping the textarea on iPhone Safari zoomed the viewport horizontally; zoom persisted after keyboard dismiss, leaving horizontal scroll until user pinch-zoomed out.
-**Root cause:** iOS Safari auto-zooms any `<input>`/`<textarea>`/`<select>` with `font-size < 16px` on focus. The `.query-input` textarea was `14px` and the `.mob-engine-row select` was `12px`.
-**Fix:** Added `font-size: 16px` overrides for both elements inside the existing `@media (max-width: 767px)` block in `frontend/index.html`. Desktop sizes unchanged.
-**Reproduced on:** real iPhone (Jimmy, 2026-04-19). Not user-scalable=no — accessibility-safe fix.
-**Commit:** see `fix(mobile): prevent iOS Safari input zoom causing horizontal scroll`
+### Phase 8.6 — iOS CSS Fixes + iPad Freeze Investigation (2026-04-19)
+
+**What shipped (both committed, both correct, no regressions):**
+
+1. **iPhone input auto-zoom fix** — commit `77c7c82`
+   iOS Safari auto-zooms any `<input>`/`<textarea>`/`<select>` with `font-size < 16px` on focus, leaving horizontal scroll after keyboard dismiss. Fixed by adding `font-size: 16px` overrides for `.query-input` and `.mob-engine-row select` inside the `@media (max-width: 767px)` block. Desktop sizes unchanged. Verified on real iPhone.
+
+2. **Global `100dvh` fix** — commit see `fix(mobile): use 100dvh globally...`
+   `100vh` on iOS Safari can include browser chrome height, causing the body to overflow and viewport coordinates to shift after programmatic scroll operations. Applied `height: 100dvh` globally (with `100vh` fallback) and removed the now-redundant mobile-only `dvh` override. Applies to all viewports — iPhone, iPad, desktop.
+
+**iPad Safari freeze — investigated, not resolved, formally deferred:**
+- **Symptom:** After Clear Session followed by a second query, the top bar, sidebar, right panel, and Clear button become unresponsive. Center panel scroll and bottom input area remain functional. Reload recovers.
+- **Repro:** Load → query 1 → Clear Session → query 2. Freeze occurs after query 2 renders.
+- **Investigation:** Full code audit of `clearSession()`, `submitQuery()`, `animateProcessingStates()`, all global state, all overlay logic, and body/viewport CSS. No JavaScript state bug found. Leading hypothesis: iOS viewport coordinate shift triggered by the clear → empty-state-paint → empty-state-removed → cards layout cycle in combination with `100vh` mismatch. The `100dvh` fix was applied as the most likely CSS-layer remedy but could not be confirmed on-device before session end.
+- **Status:** Deferred. See Known Limitations below.
+- **Note:** `clearSession()` has regressed 3 times (commits e14b447, 04e88d6, this session). It is high-fragility. Consider test coverage or a rewrite before Phase 9 ships.
+
+### Known Limitations / Supported Platforms
+
+This demo is optimized for **desktop browsers and iPhone Safari**. iPad Safari has a known issue where the top bar becomes unresponsive after using Clear Session followed by a second query. The center generation panel and bottom input remain functional. Workaround: reload the page. This is a low-priority issue given the demo's recruiter-focused audience (primarily desktop traffic).
 
 ### GitHub Auth (Recurring Issue)
 `gh` CLI requires a classic PAT (`ghp_`) with `repo` and `read:org` scopes. If repo creation fails, re-authenticate:

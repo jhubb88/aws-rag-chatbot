@@ -67,6 +67,12 @@ These rules apply to every Claude Code session in this project without exception
 - SSM SambaNova API key path: /rag-chatbot/sambanova-api-key (active — do not overwrite)
 - SSM Nebius API key path: /rag-chatbot/nebius-api-key (dormant rollback key — do not delete before 2026-05-19)
 
+## iOS / Mobile CSS Rules
+
+- **Always use `height: 100dvh` with `height: 100vh` as a fallback for full-height layouts.** `100vh` on iOS Safari includes browser chrome (address bar) in some states and excludes it in others — this causes the body to overflow and viewport touch coordinates to shift, especially after programmatic scroll operations or rapid DOM swaps. Confirmed bug on this project (2026-04-19). Apply `dvh` globally, not just inside a mobile media query.
+- **All `<input>`, `<textarea>`, and `<select>` elements must have `font-size: 16px` minimum on mobile.** iOS Safari auto-zooms any focusable form element with `font-size < 16px`, causing horizontal viewport zoom that persists after blur. Apply via mobile breakpoint or globally if desktop size doesn't matter. Confirmed bug and fix on this project (2026-04-19, commit `77c7c82`).
+- **iPad portrait (768–820px CSS viewport) is an unsupported middle-ground for this project.** It falls above the `max-width: 767px` mobile breakpoint (gets desktop layout) but below typical desktop usage patterns. The mobile slide-over overlays are JS-wired but CSS-hidden at this width. A known iPad Safari freeze after Clear Session is deferred as low-priority. Do not attempt iPad-specific layout fixes without explicit approval.
+
 ## Known Infrastructure Quirks
 
 ### CloudFront Invalidation — Distribution EN88LEBW14923 (RAG Chatbot)
