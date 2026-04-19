@@ -104,6 +104,9 @@ Nebius AI Studio (Llama 3.3-70B) was the original Provider B. A 1-token syntheti
 **$20/month budget cap, hard.**
 Budgets alarms at $15 and $18. Actual monthly cost at portfolio traffic runs in single-digit dollars. Every latency lever is sized against this ceiling — no provisioned throughput, no dedicated endpoints, no premium inference tiers that can't justify their delta at demo volume.
 
+**Graceful rate-limit handling.**
+SambaNova's free tier enforces burst rate limits (240 RPM). Rather than surfacing a generic 500 when SambaNova returns 429, the Lambda detects the rate-limit response, logs retry-after and remaining-quota headers for diagnostics, and returns HTTP 200 with `{"error_type": "rate_limit", ...}` in the body. The frontend renders a dedicated "Rate Limited" card directing the user to switch to Bedrock. Production-style graceful degradation instead of a confusing API error.
+
 ---
 
 ## Cost Guardrails

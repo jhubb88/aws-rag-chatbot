@@ -67,6 +67,11 @@ These rules apply to every Claude Code session in this project without exception
 - SSM SambaNova API key path: /rag-chatbot/sambanova-api-key (active — do not overwrite)
 - SSM Nebius API key path: /rag-chatbot/nebius-api-key (dormant rollback key — do not delete before 2026-05-19)
 
+## Known Infrastructure Quirks
+
+### CloudFront Invalidation — Distribution EN88LEBW14923 (RAG Chatbot)
+Always use `/*` as the invalidation path on this distribution. Invalidating `/index.html` alone does not reliably clear the cache — the live URL resolves through a different internal path. Verified 2026-04-19: `/index.html` invalidation completed successfully but the live site continued serving stale HTML; `/*` cleared it immediately.
+
 ## Known Retrieval Issues
 
 ### "What projects has Jimmy built?" — retrieval miss (2026-04-18)
