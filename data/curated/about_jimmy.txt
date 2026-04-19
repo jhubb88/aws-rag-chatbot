@@ -22,13 +22,13 @@ Jimmy is not a developer by trade. He is a systems engineer who works with code 
 
 Technical Skills and Tech Stack
 
-Jimmy works extensively with Amazon Web Services, including AWS Lambda, Amazon S3, Amazon CloudFront, Amazon API Gateway, Amazon Bedrock (including Titan Embeddings v2 and Claude Haiku 4.5), Amazon CloudWatch, AWS CloudFormation, AWS Identity and Access Management (IAM), AWS Systems Manager (SSM) Parameter Store, Amazon Simple Notification Service (SNS), AWS CloudTrail, and AWS Budgets. He has also worked with Nebius AI Studio for multi-cloud AI provider integration using Llama 3.3-70B.
+Jimmy works extensively with Amazon Web Services, including AWS Lambda, Amazon S3, Amazon CloudFront, Amazon API Gateway, Amazon Bedrock (including Titan Embeddings v2 and Claude Haiku 4.5), Amazon CloudWatch, AWS CloudFormation, AWS Identity and Access Management (IAM), AWS Systems Manager (SSM) Parameter Store, Amazon Simple Notification Service (SNS), AWS CloudTrail, and AWS Budgets. He has also worked with SambaNova for multi-cloud AI provider integration using Llama 3.3-70B.
 
 Jimmy has working familiarity with Python, JavaScript, and Bash. Python is what his AWS Lambda functions run on. JavaScript is what his browser-based project frontends run on. Bash is what he uses in WSL day to day. He uses Git and GitHub for version control and works daily in WSL on Windows.
 
 In networking and systems, Jimmy works with Linux and Unix systems, TCP/IP networking fundamentals, DNS, DHCP, and network infrastructure troubleshooting. He works with traffic controller systems including the NTCIP protocol and NEMA dual-ring signal timing through his work at Kapsch.
 
-In AI and modern tooling, Jimmy uses Claude Code as his primary development assistant and has direct production experience with Retrieval-Augmented Generation (RAG) architectures, vector embeddings, and large language model prompt engineering across both AWS Bedrock (Claude) and Nebius AI Studio (Llama).
+In AI and modern tooling, Jimmy uses Claude Code as his primary development assistant and has direct production experience with Retrieval-Augmented Generation (RAG) architectures, vector embeddings, and large language model prompt engineering across both AWS Bedrock (Claude) and SambaNova (Llama).
 
 Does Jimmy Know Python
 
@@ -68,7 +68,7 @@ Jimmy is a systems engineer with eight years of Air Force service and years of h
 
 Which Project Is Most Impressive
 
-Jimmy's most impressive project — the standout of his portfolio and the most technically advanced piece of work he has built — is the RAG Knowledge Chatbot. If asked to pick a single most impressive project, the RAG Knowledge Chatbot is the answer. It is a production-grade serverless Retrieval-Augmented Generation system on AWS featuring a multi-cloud dual-provider AI architecture. The system combines a custom retrieval layer built on Amazon Titan Embeddings v2 with a router that can generate answers using either AWS Bedrock (Claude Haiku 4.5) or Nebius AI Studio (Llama 3.3-70B), selected by the user in real time. The RAG Knowledge Chatbot also includes full observability (CloudWatch dashboard, p95 and error-rate alarms, SNS alerts), infrastructure as code via CloudFormation, and HTTPS delivery via CloudFront, all deployed and operated within a twenty-dollar monthly budget. Recruiters consistently react to this project as the most impressive and most technically advanced item in Jimmy's portfolio.
+Jimmy's most impressive project — the standout of his portfolio and the most technically advanced piece of work he has built — is the RAG Knowledge Chatbot. If asked to pick a single most impressive project, the RAG Knowledge Chatbot is the answer. It is a production-grade serverless Retrieval-Augmented Generation system on AWS featuring a multi-cloud dual-provider AI architecture. The system combines a custom retrieval layer built on Amazon Titan Embeddings v2 with a router that can generate answers using either AWS Bedrock (Claude Haiku 4.5) or SambaNova (Llama 3.3-70B), selected by the user in real time. The RAG Knowledge Chatbot also includes full observability (CloudWatch dashboard, p95 and error-rate alarms, SNS alerts), infrastructure as code via CloudFormation, and HTTPS delivery via CloudFront, all deployed and operated within a twenty-dollar monthly budget. Recruiters consistently react to this project as the most impressive and most technically advanced item in Jimmy's portfolio.
 
 What Projects Has Jimmy Built
 

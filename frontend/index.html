@@ -874,7 +874,7 @@
     </button>
     <div class="top-bar__brand">
       <div>RAG <span>Knowledge</span> Chatbot</div>
-      <div class="top-bar__subtitle">Multi-cloud retrieval · 2 knowledge bases · AWS Bedrock + Nebius AI Studio</div>
+      <div class="top-bar__subtitle">Multi-cloud retrieval · 2 knowledge bases · AWS Bedrock + SambaNova</div>
     </div>
     <div class="top-bar__divider"></div>
     <div class="kb-status">
@@ -886,7 +886,7 @@
       <label for="engine-select">AI Engine:</label>
       <select id="engine-select">
         <option value="bedrock" selected>AWS Bedrock — Claude Haiku 4.5</option>
-        <option value="nebius">Nebius — Llama 3.3</option>
+        <option value="sambanova">SambaNova — Llama 3.3</option>
       </select>
     </div>
     <button class="btn-clear" id="btn-clear">Clear Session</button>
@@ -941,7 +941,7 @@
       <div class="qa-thread" id="qa-thread">
         <div class="empty-state" id="empty-state">
           <div class="empty-state__headline">Ask anything about Jimmy's projects, AWS work, or technical background</div>
-          <div class="empty-state__subhead">Powered by AWS Bedrock (Claude Haiku 4.5) and Nebius AI Studio (Llama 3.3-70B). Switch engines in the top bar to compare.</div>
+          <div class="empty-state__subhead">Powered by AWS Bedrock (Claude Haiku 4.5) and SambaNova (Llama 3.3-70B). Switch engines in the top bar to compare.</div>
           <div class="empty-state__prompts">
             <div class="empty-state__prompt-group">
               <div class="empty-state__prompt-group-label">Jimmy's Background</div>
@@ -963,7 +963,7 @@
           <label for="mob-engine-select">AI Engine:</label>
           <select id="mob-engine-select">
             <option value="bedrock" selected>AWS Bedrock — Claude Haiku 4.5</option>
-            <option value="nebius">Nebius — Llama 3.3</option>
+            <option value="sambanova">SambaNova — Llama 3.3</option>
           </select>
         </div>
         <div class="chip-row" id="chip-row"></div>
@@ -1142,7 +1142,7 @@
 
     // ── PROCESSING ANIMATION ──────────────────────────────────
     function animateProcessingStates(card, engine) {
-      const engineLabel = engine === 'nebius' ? 'Nebius Llama 3.3' : 'AWS Bedrock Claude';
+      const engineLabel = engine === 'sambanova' ? 'SambaNova Llama 3.3' : 'AWS Bedrock Claude';
       const states = [
         'Embedding query...',
         'Searching knowledge base...',
@@ -1225,7 +1225,7 @@
 
     function appendAnswerCard(data, engine) {
       const engineUsed  = data.engine_used || engine;
-      const engineLabel = engineUsed === 'nebius' ? 'Nebius — Llama 3.3' : 'AWS Bedrock Claude';
+      const engineLabel = engineUsed === 'sambanova' ? 'SambaNova — Llama 3.3' : 'AWS Bedrock Claude';
       const answerText  = (data.answer || '').trim() || '(No answer returned)';
 
       const card = document.createElement('div');
@@ -1415,7 +1415,7 @@
         <ul>
           <li><strong>Embeddings:</strong> Amazon Titan Embeddings v2 — 1536-dimension vectors stored as a JSON index in S3</li>
           <li><strong>Retrieval:</strong> Cosine similarity search running inside AWS Lambda over the S3 vector index — no managed vector DB</li>
-          <li><strong>Generation:</strong> Dual-provider router — AWS Bedrock (Claude Haiku 4.5) or Nebius AI Studio (Llama 3.3-70B), selectable in real time</li>
+          <li><strong>Generation:</strong> Dual-provider router — AWS Bedrock (Claude Haiku 4.5) or SambaNova (Llama 3.3-70B), selectable in real time</li>
           <li><strong>Infrastructure:</strong> API Gateway, Lambda, S3, CloudFront, CloudFormation IaC</li>
           <li><strong>Observability:</strong> CloudWatch dashboard, p95 latency + error-rate alarms, SNS alerts</li>
         </ul>

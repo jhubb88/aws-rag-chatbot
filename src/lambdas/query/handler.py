@@ -2,9 +2,9 @@
 query/handler.py — RAG Chatbot Query Lambda
 Phase 3 | rag-chatbot project
 
-Accepts POST /query with body: {"query": "...", "selected_engine": "nebius" | "bedrock"}
+Accepts POST /query with body: {"query": "...", "selected_engine": "sambanova" | "bedrock"}
 Embeds the query via Bedrock Titan Embeddings v2, retrieves top-k chunks by cosine
-similarity from the S3 vector index, and routes to either Nebius AI Studio (Llama 3.1)
+similarity from the S3 vector index, and routes to either SambaNova (Llama 3.3-70B)
 or AWS Bedrock (Claude 3 Haiku) for answer generation.
 
 CORS: Every response includes Access-Control-Allow-Origin: '*' so Phase 4 browser
@@ -28,9 +28,9 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "rag-chatbot-603509861186-dev")
 INDEX_KEY = "documents/index.json"
 EMBED_MODEL = "amazon.titan-embed-text-v2:0"
 HAIKU_MODEL = "us.anthropic.claude-haiku-4-5-20251001-v1:0"  # cross-region inference profile
-NEBIUS_ENDPOINT = "https://api.studio.nebius.ai/v1/chat/completions"
-NEBIUS_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
-SSM_KEY_PATH = os.environ.get("NEBIUS_API_KEY_PATH", "/rag-chatbot/nebius-api-key")
+SAMBANOVA_ENDPOINT = "https://api.sambanova.ai/v1/chat/completions"
+SAMBANOVA_MODEL = "Meta-Llama-3.3-70B-Instruct"
+SSM_KEY_PATH = os.environ.get("SAMBANOVA_API_KEY_PATH", "/rag-chatbot/sambanova-api-key")
 TOP_K = 5
 CHUNK_CHAR_CAP = 2000  # max chars per chunk sent to the model
 
@@ -49,7 +49,7 @@ def lambda_handler(event, context):
     # Warm-up ping from EventBridge
     if event.get("warmup"):
         print("[INFO] Warm-up ping received — container is warm")
-        _warmup_nebius()
+        _warmup_sambanova()
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
@@ -62,7 +62,7 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event.get("body") or "{}")
         query = body.get("query", "").strip()
-        selected_engine = body.get("selected_engine", "nebius").lower()
+        selected_engine = body.get("selected_engine", "bedrock").lower()
     except Exception as e:
         print(f"[ERROR] Failed to parse request body: {e}")
         return _build_response(400, {"error": "Invalid request body — must be JSON with 'query' field"})
@@ -70,8 +70,8 @@ def lambda_handler(event, context):
     if not query:
         return _build_response(400, {"error": "'query' field is required and cannot be empty"})
 
-    if selected_engine not in ("nebius", "bedrock"):
-        return _build_response(400, {"error": f"'selected_engine' must be 'nebius' or 'bedrock', got: {selected_engine}"})
+    if selected_engine not in ("sambanova", "bedrock"):
+        return _build_response(400, {"error": f"'selected_engine' must be 'sambanova' or 'bedrock', got: {selected_engine}"})
 
     # Log only the fields we control — not the full event (which includes headers and auth context).
     # Query is truncated to 200 chars to keep logs useful without dumping arbitrary user input verbatim.
@@ -100,8 +100,8 @@ def lambda_handler(event, context):
     print(f"[INFO] Retrieved {len(top_chunks)} chunks. Top score: {top_chunks[0]['score']:.4f}")
 
     # Step 4: Generate answer
-    if selected_engine == "nebius":
-        answer, engine_used = _generate_nebius(query, top_chunks)
+    if selected_engine == "sambanova":
+        answer, engine_used = _generate_sambanova(query, top_chunks)
     else:
         answer, engine_used = _generate_bedrock(query, top_chunks)
 
@@ -206,17 +206,17 @@ def _retrieve_top_k(query_embedding, index, k=3):
 
 
 # ---------------------------------------------------------------------------
-# Generation — Nebius (live, testable)
+# Generation — SambaNova
 # ---------------------------------------------------------------------------
 
-def _generate_nebius(query, chunks):
+def _generate_sambanova(query, chunks):
     """
-    Call Nebius AI Studio (OpenAI-compatible) with retrieved chunks as context.
+    Call SambaNova (OpenAI-compatible) with retrieved chunks as context.
     Returns (answer_text, engine_label) or (None, None) on failure.
     """
-    print("[INFO] Generating answer via Nebius AI Studio")
+    print("[INFO] Generating answer via SambaNova")
 
-    api_key = _get_nebius_api_key()
+    api_key = _get_sambanova_api_key()
     if api_key is None:
         return None, None
 
@@ -235,6 +235,9 @@ def _generate_nebius(query, chunks):
         "Write in your own words and voice, combining facts from multiple context chunks "
         "into a flowing answer. Do not structure your answer as bullet points or sectioned "
         "lists unless the question genuinely requires them. "
+        "When answering questions about Jimmy's background, cite specific proper nouns "
+        "from the context — employer names, specific technologies, certifications, and "
+        "credentials by name — do not paraphrase them into generic descriptions. "
         "Be concise and accurate."
     )
 
@@ -245,7 +248,7 @@ def _generate_nebius(query, chunks):
     )
 
     payload_dict = {
-        "model": NEBIUS_MODEL,
+        "model": SAMBANOVA_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -253,11 +256,11 @@ def _generate_nebius(query, chunks):
         "max_tokens": 256,
         "temperature": 0.3,
     }
-    print(f"[DEBUG] Nebius request body: {json.dumps({k: v for k, v in payload_dict.items() if k != 'messages'})}")
+    print(f"[DEBUG] SambaNova request body: {json.dumps({k: v for k, v in payload_dict.items() if k != 'messages'})}")
     payload = json.dumps(payload_dict).encode("utf-8")
 
     req = urllib.request.Request(
-        NEBIUS_ENDPOINT,
+        SAMBANOVA_ENDPOINT,
         data=payload,
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -272,24 +275,24 @@ def _generate_nebius(query, chunks):
         answer = result["choices"][0]["message"]["content"].strip()
         usage = result.get("usage", {})
         finish = result["choices"][0].get("finish_reason")
-        print(f"[INFO] Nebius usage: prompt_tokens={usage.get('prompt_tokens')} completion_tokens={usage.get('completion_tokens')} finish_reason={finish}")
-        print(f"[INFO] Nebius generation successful ({len(answer)} chars)")
-        return answer, "nebius"
+        print(f"[INFO] SambaNova usage: prompt_tokens={usage.get('prompt_tokens')} completion_tokens={usage.get('completion_tokens')} finish_reason={finish}")
+        print(f"[INFO] SambaNova generation successful ({len(answer)} chars)")
+        return answer, "sambanova"
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
-        print(f"[ERROR] Nebius HTTP error {e.code}: {body}")
+        print(f"[ERROR] SambaNova HTTP error {e.code}: {body}")
         return None, None
     except Exception as e:
-        print(f"[ERROR] Nebius generation failed: {e}")
+        print(f"[ERROR] SambaNova generation failed: {e}")
         return None, None
 
 
-def _get_nebius_api_key():
-    """Fetch Nebius API key from SSM Parameter Store. Returns string or None."""
+def _get_sambanova_api_key():
+    """Fetch SambaNova API key from SSM Parameter Store. Returns string or None."""
     try:
         response = ssm.get_parameter(Name=SSM_KEY_PATH, WithDecryption=True)
         key = response["Parameter"]["Value"]
-        print(f"[INFO] Nebius API key retrieved from SSM ({SSM_KEY_PATH})")
+        print(f"[INFO] SambaNova API key retrieved from SSM ({SSM_KEY_PATH})")
         return key
     except ssm.exceptions.ParameterNotFound:
         print(f"[ERROR] SSM parameter not found: {SSM_KEY_PATH}")
@@ -299,21 +302,21 @@ def _get_nebius_api_key():
         return None
 
 
-def _warmup_nebius() -> None:
-    """Fire a cheap synthetic Nebius call to keep their inference endpoint warm.
+def _warmup_sambanova() -> None:
+    """Fire a cheap synthetic SambaNova call to keep their inference endpoint warm.
     Never raises — all errors are caught and logged as WARNING."""
     try:
-        api_key = _get_nebius_api_key()
+        api_key = _get_sambanova_api_key()
 
         payload = json.dumps({
-            "model": NEBIUS_MODEL,
+            "model": SAMBANOVA_MODEL,
             "messages": [{"role": "user", "content": "ping"}],
             "max_tokens": 1,
             "temperature": 0,
         }).encode("utf-8")
 
         req = urllib.request.Request(
-            NEBIUS_ENDPOINT,
+            SAMBANOVA_ENDPOINT,
             data=payload,
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -326,11 +329,11 @@ def _warmup_nebius() -> None:
         with urllib.request.urlopen(req, timeout=20) as resp:
             resp.read()
         duration_ms = round((time.time() - t0) * 1000)
-        print(f"[INFO] Nebius warmup: duration_ms={duration_ms} status=ok")
+        print(f"[INFO] SambaNova warmup: duration_ms={duration_ms} status=ok")
     except urllib.error.HTTPError as e:
-        print(f"[WARNING] Nebius warmup failed: HTTP {e.code}")
+        print(f"[WARNING] SambaNova warmup failed: HTTP {e.code}")
     except Exception as e:
-        print(f"[WARNING] Nebius warmup failed: {e}")
+        print(f"[WARNING] SambaNova warmup failed: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -393,7 +396,7 @@ def _generate_bedrock(query, chunks):
             print(f"[ERROR] Bedrock AccessDeniedException — AWS: {aws_msg}")
             msg = (
                 "Bedrock Claude Haiku is currently unavailable. "
-                "Please use the Nebius engine."
+                "Please use the SambaNova engine."
             )
             return msg, "bedrock_blocked"
         print(f"[ERROR] Bedrock ClientError ({code}): {e}")

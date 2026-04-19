@@ -30,7 +30,7 @@ Jimmy Hubbard's Portfolio Projects
    Python, AWS Lambda, API Gateway, S3, Polly.
 
 7. RAG Knowledge Chatbot — Serverless retrieval-augmented generation chatbot using Bedrock
-   Titan Embeddings, Nebius Llama 3.3, AWS Lambda, API Gateway, S3, CloudFront.
+   Titan Embeddings, SambaNova Llama 3.3, AWS Lambda, API Gateway, S3, CloudFront.
 
 Jimmy has worked with AWS services including: Lambda, S3, CloudFront, API Gateway,
 Bedrock (Titan Embeddings v2), CloudWatch, IAM, SSM Parameter Store, and CloudFormation.
