@@ -11,10 +11,10 @@ Parameters:
     AllowedValues: [dev, prod]
     Description: Deployment environment
 
-  NebiusApiKeyPath:
+  SambanovaApiKeyPath:
     Type: String
-    Default: /rag-chatbot/nebius-api-key
-    Description: SSM parameter path for Nebius API key (must already exist)
+    Default: /rag-chatbot/sambanova-api-key
+    Description: SSM parameter path for SambaNova API key (must already exist)
 
 Resources:
 
@@ -185,7 +185,7 @@ Resources:
                   - aws-marketplace:ViewSubscriptions
                   - aws-marketplace:Subscribe
                 Resource: "*"
-              # SSM — Nebius API key
+              # SSM — SambaNova API key
               - Sid: SSMGetParameter
                 Effect: Allow
                 Action:
@@ -386,7 +386,7 @@ Resources:
       Environment:
         Variables:
           S3_BUCKET: !Ref RagChatbotBucket
-          NEBIUS_API_KEY_PATH: !Ref NebiusApiKeyPath
+          SAMBANOVA_API_KEY_PATH: !Ref SambanovaApiKeyPath
           ENVIRONMENT: !Ref Environment
       Tags:
         - Key: Project

@@ -6,12 +6,12 @@ Phase 3 | rag-chatbot project
 Runs the query handler directly (no Lambda runtime needed).
 Requires:
   - Bedrock Titan Embeddings v2 (live, unblocked)
-  - Nebius API key in SSM at /rag-chatbot/nebius-api-key (live)
+  - SambaNova API key in SSM at /rag-chatbot/sambanova-api-key (live)
   - documents/index.json in S3 (built by ingest Lambda -- 15 chunks)
 
-Bedrock generation path (selected_engine=bedrock) is code-complete but
-untestable until AWS Support resolves the account-level block on
-anthropic.claude-3-haiku-20240307-v1:0.
+Both providers are fully operational. Set TEST_ENGINE to "sambanova" or
+"bedrock" to exercise either path. No AWS Support blockers or account-level
+restrictions are active.
 
 IMPORTANT: AWS_PROFILE must be set before handler is imported.
 handler.py creates boto3 clients at module load time, so any profile
@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "lambdas
 import handler  # noqa: E402 -- must come after env vars are set
 
 TEST_QUERY = "What projects has Jimmy built?"
-TEST_ENGINE = "nebius"
+TEST_ENGINE = "sambanova"
 
 
 def run():
