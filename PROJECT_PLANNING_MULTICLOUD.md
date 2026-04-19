@@ -131,8 +131,12 @@ Cold worst-case dropped from 32,279ms → 14,860ms (~54%). Warm queries now 5–
 ### Query Vocabulary Gap (Deferred — Phase 9)
 Open-ended recruiter queries like "what should I look at first" score below the 0.40 retrieval threshold because the curated content uses comparative vocabulary (impressive, flagship, best) rather than entry-point vocabulary (start with, first thing). The right fix is query rewriting at the query Lambda layer, not additional content patches. Candidate for Phase 9.
 
-### Horizontal Scroll on Mobile — Phase 8.6 / Phase 9 Candidate
-iPhone Safari shows horizontal page scroll when swiping left/right. Root cause: an element overflowing viewport width. Does not affect functionality — queries, overlays, and session clear all work. Not blocking demo use. Fix: identify overflowing element with `overflow-x: hidden` on body or targeted containment. Log here for Phase 8.6 or Phase 9 attention.
+### Horizontal Scroll on Mobile — ✅ Resolved (Phase 8.6, 2026-04-19)
+**Symptom:** Tapping the textarea on iPhone Safari zoomed the viewport horizontally; zoom persisted after keyboard dismiss, leaving horizontal scroll until user pinch-zoomed out.
+**Root cause:** iOS Safari auto-zooms any `<input>`/`<textarea>`/`<select>` with `font-size < 16px` on focus. The `.query-input` textarea was `14px` and the `.mob-engine-row select` was `12px`.
+**Fix:** Added `font-size: 16px` overrides for both elements inside the existing `@media (max-width: 767px)` block in `frontend/index.html`. Desktop sizes unchanged.
+**Reproduced on:** real iPhone (Jimmy, 2026-04-19). Not user-scalable=no — accessibility-safe fix.
+**Commit:** see `fix(mobile): prevent iOS Safari input zoom causing horizontal scroll`
 
 ### GitHub Auth (Recurring Issue)
 `gh` CLI requires a classic PAT (`ghp_`) with `repo` and `read:org` scopes. If repo creation fails, re-authenticate:
