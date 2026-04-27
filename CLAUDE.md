@@ -1,5 +1,5 @@
 # CLAUDE.md — RAG Chatbot Global Rules
-Last updated: 2026-04-19
+Last updated: 2026-04-27
 
 These rules apply to every Claude Code session in this project without exception.
 
@@ -26,10 +26,12 @@ These rules apply to every Claude Code session in this project without exception
 - Never force push without explicit confirmation from Jimmy
 - Never batch or deliver CC prompts ahead of time — one at a time, only when needed
 - When retrieval returns an answer that contradicts known source content, the first diagnostic step is to inspect top-K retrieved chunks AND their full ranking in CloudWatch logs or via direct index query — not to rewrite the source file. Source rewrites are a downstream fix; retrieval diagnosis comes first.
-- SambaNova warmup ping in query Lambda's warmup branch is permanent. Do not remove or alter without explicit approval. Ground truth log lines `[INFO] SambaNova warmup: duration_ms=X status=ok` and `[WARNING] SambaNova warmup failed: <error>` are also permanent.
+- Warmup branch in the query Lambda primes the index cache only — no synthetic provider ping. Bedrock has no cold endpoint to keep warm. Ground-truth log line `[INFO] Warmup: index cache primed (N chunks)` is permanent. Do not add provider warmup pings without explicit approval.
 - To force Lambda index cache refresh after ingest, bump the `INDEX_CACHE_VERSION` env var (e.g., 1→2) via `aws lambda update-function-configuration`. No code change needed. Keep this env var permanently — do not remove it.
-- SambaNova free tier rate limits: 240 RPM, 48K requests/day. No provisioned throughput required at portfolio demo volume.
 - Flag any approach to autonomous edits (even small ones) before applying — stop and confirm between steps, no exceptions.
+
+## Lesson — SambaNova Free-Tier Trap (permanent)
+SambaNova's free tier was 20 RPD on Llama 3.3-70B (verified via API response headers, not docs). The Developer Tier upgrade documented as 48K RPD requires a card on file — but the auto-upgrade is broken in SambaNova's billing migration as of 2026-04-27. Community forum threads confirm widespread issue; staff response was "manually @ Coby in the forum and I'll move you over." Lesson: never depend on a third-party AI provider whose tier-upgrade path requires a forum @-mention to function. SambaNova was removed from this project in v1.2 (Phase 11). Rule for any future provider integration: curl the live endpoint with a real key BEFORE writing integration code. Verify rate-limit headers match documented limits. Test the upgrade/billing flow on a throwaway account before committing architecture.
 
 ## Portfolio Context
 - The portfolio-wide infrastructure reference lives at:
@@ -50,8 +52,8 @@ These rules apply to every Claude Code session in this project without exception
 - Never end a session without a wrap-up file
 - Wrap-up must include: what was completed, what was skipped, errors hit, and exact next steps
 
-## Bedrock
-- Bedrock is fully operational as of 2026-04-19. Claude Haiku 4.5 is the active Provider A model.
+## Bedrock (sole generation provider as of v1.2)
+- Bedrock is the only generation path. Claude Haiku 4.5 is the active model.
 - Model ID: `us.anthropic.claude-haiku-4-5-20251001-v1:0` (cross-region inference profile)
 - Bedrock Titan Embeddings v2 is active for all query and ingest embeddings.
 
@@ -64,8 +66,11 @@ These rules apply to every Claude Code session in this project without exception
 - Region: us-east-1
 - Account ID: 603509861186
 - AWS CLI profile: portfolio-user
-- SSM SambaNova API key path: /rag-chatbot/sambanova-api-key (active — do not overwrite)
-- SSM Nebius API key path: /rag-chatbot/nebius-api-key (dormant rollback key — do not delete before 2026-05-19)
+- SSM SambaNova API key path: /rag-chatbot/sambanova-api-key (DORMANT post-v1.2 — kept for rollback only, no live code reads it)
+- SSM Nebius API key path: /rag-chatbot/nebius-api-key (DORMANT — do not delete before 2026-05-19)
+
+## CloudFormation Stack — DRIFT WARNING (added v1.2)
+The `rag-knowledge-chatbot` CFN stack has drifted from the local template. Until Phase 12 realignment is complete, do NOT run `aws cloudformation update-stack` against this stack — the update will fail (`AlreadyExistsException` on warmup resources) or revert Lambda code (template's `Code.S3Key` points to stale zip). All infra changes must use direct CLI until realignment ships. Live stack name is `rag-knowledge-chatbot`, NOT `rag-chatbot-dev` (which is an abandoned `REVIEW_IN_PROGRESS` shell). Full drift inventory in `PROJECT_PLANNING_MULTICLOUD.md` Phase 12 candidate.
 
 ## iOS / Mobile CSS Rules
 
@@ -78,30 +83,26 @@ These rules apply to every Claude Code session in this project without exception
 ### CloudFront Invalidation — Distribution EN88LEBW14923 (RAG Chatbot)
 Always use `/*` as the invalidation path on this distribution. Invalidating `/index.html` alone does not reliably clear the cache — the live URL resolves through a different internal path. Verified 2026-04-19: `/index.html` invalidation completed successfully but the live site continued serving stale HTML; `/*` cleared it immediately.
 
-### SambaNova Warmup Ping Timeout
-Set to 3s. If WARNING logs appear on warmup pings during normal SambaNova operation (not rate-limited), consider raising to 5s. The 12s alarm threshold has ~3s headroom against worst-case cold container + SambaNova timeout.
-
 ## Known Retrieval Issues
 
 ### "What projects has Jimmy built?" — retrieval miss (2026-04-18)
 **Query:** "What projects has Jimmy built?"
-**Symptom:** Both providers hedge with "context doesn't provide details about other specific projects" despite the answer existing in three index chunks. The cleanest chunk (project_index.txt, 345 chars) scored 0.4179 and ranked 5th overall — missing the top-3 cutoff by 0.0329.
+**Symptom:** Provider hedged with "context doesn't provide details about other specific projects" despite the answer existing in three index chunks. The cleanest chunk (project_index.txt, 345 chars) scored 0.4179 and ranked 5th overall — missing the top-3 cutoff by 0.0329.
 **Root cause:** top_k=3 is too aggressive for a 2,027-chunk index. Narrative career chunks outrank enumeration chunks due to vocabulary overlap with "built / projects / Jimmy." The index content is correct; the cutoff is too tight.
-**Status:** resolved 2026-04-18 commit b30b6ab — TOP_K raised 3→5, both providers now name all 7 projects. First-touch cold (post warmup hardening, commit `87e1e21`): ~4.7s Lambda, cache hit confirmed. Warmup now primes index cache + uses 3s SambaNova timeout — p95 alarm stable.
+**Status:** resolved 2026-04-18 commit b30b6ab — TOP_K raised 3→5, all 7 projects now named. First-touch cold (post warmup hardening, commit `87e1e21`): ~4.7s Lambda, cache hit confirmed. Warmup primes index cache — p95 alarm stable.
 
 ## README Maintenance Rule
 
 README.md is a living document and must be kept current as code and infrastructure change. Every Claude Code session that makes significant changes to this project MUST update README.md as part of the same work, not as a separate cleanup pass.
 
 Triggers that require README.md updates:
-- Model change (either provider) — update Tech Stack table, Architecture section, Engineering Decisions if the change is load-bearing
-- Provider change (switching SambaNova to Groq/Together/etc., or adding a third provider) — update all references including the opening paragraph
+- Model change — update Tech Stack table, Architecture section, Engineering Decisions if the change is load-bearing
+- Provider change — update all references including the opening paragraph
 - New AWS service added or removed from the stack — update Tech Stack table
 - New KB added or KB scope changed — update What This Project Is, Architecture, Engineering Decisions
 - New latency lever shipped (streaming, index format change, etc.) — update Engineering Decisions
 - Cost structure changes materially — update Cost Guardrails numbers
-- New tag (v1.1, v2.0, etc.) — update Current Status
-- Phase 9 items completed — move relevant lines out of the "active work" mention
+- New tag (v1.1, v1.2, v2.0, etc.) — update Current Status
 
 README.md updates should be committed in the SAME commit as the code change that triggered them, not as a separate docs commit. This keeps the history honest — the README shows what was true at each tag, not what was aspirational.
 

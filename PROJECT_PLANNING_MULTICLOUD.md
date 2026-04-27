@@ -1,5 +1,12 @@
 # RAG Knowledge Chatbot — Project Planning Document
-### Multi-Cloud Edition | Last Updated: 2026-04-19
+### Multi-Cloud Edition (historical name — see note below) | Last Updated: 2026-04-27
+
+> This is the source-of-truth project log for the RAG Knowledge Chatbot. Every phase, decision, deferred item, and commit reference lives here.
+>
+> **Note on filename:** This file is named `PROJECT_PLANNING_MULTICLOUD.md` for historical reasons — the project originally shipped as a multi-cloud demo (AWS Bedrock + SambaNova). As of `v1.2-bedrock-only` (2026-04-27), the project is Bedrock-only — see Phase 11. The "MULTICLOUD" suffix is preserved to avoid breaking existing links and references; rename to `PROJECT_PLANNING.md` is a Phase 12 cleanup candidate.
+>
+> Note: portfolio-page surfaces (advanced-projects repo) are handled in a separate workflow and may lag the live site by short windows.
+
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 **Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
 **Phase 3 Status:** ✅ Complete — query Lambda deployed, smoke test + live API gate passed, commit `c428b22`, tag `v0.4-query`
@@ -10,6 +17,7 @@
 **Phase 7 Status:** ✅ Complete — empty state, top bar subtitle, contrast fix, About modal, commit `2fba0f4`, tag `v0.9-polish`
 **Phase 8 Status:** ✅ Complete — 2-KB expansion shipped, EventBridge warm-up live, Bedrock default, commit `f872fc0`, tag `v1.0-multikb`
 **Phase 8.5 Status:** ✅ Complete — mobile responsive layout, iPhone Safari bugs resolved, commit `ba601b5` (no new tag — v1.0-multikb stands)
+**Phase 11 Status:** ✅ Complete — Bedrock-only rework: frontend strip commit `430d8ab`, Lambda strip commit `636891c`, docs sweep tagged `v1.2-bedrock-only`
 
 ---
 
@@ -430,6 +438,114 @@ SambaNova warm: 2.5–4.4s Lambda — **clear improvement over Nebius 3–9s**. 
 **System prompt change:** One instruction added: *"When answering questions about Jimmy's background, cite specific proper nouns from the context — employer names, specific technologies, certifications, and credentials by name — do not paraphrase them into generic descriptions."* Partially effective (Air Force name appeared), not sufficient to force Kapsch/clearance/AWS specifics. This is the final system prompt iteration per hard gate — no further tuning.
 
 **KB re-ingest (Step 8.5):** `data/curated/about_jimmy.txt` and `data/curated/project_summary.txt` updated — Nebius → SambaNova references. Re-ingest revealed an ingest pipeline path normalization bug: curated files were indexed under `curated/<name>` prefix but re-ingested as `<name>`, so old stale entries were not removed. Fixed by manual index surgery (filter + re-upload). Index restored to 2,027 chunks. Backup at `documents/index.json.bak-sambanova-swap`. `INDEX_CACHE_VERSION=1` Lambda env var added to force container cache invalidation after re-ingest — bump this value any time re-ingest is run.
+
+---
+
+## Phase 11 — Bedrock-Only Rework ✅ Complete (2026-04-27) | tag `v1.2-bedrock-only`
+
+### Why
+SambaNova's free tier (20 RPD on Llama 3.3-70B, verified via API headers) is insufficient for any sustained portfolio demo traffic. The Developer Tier upgrade (documented as 48K RPD with card on file) is broken in SambaNova's billing migration — the auto-upgrade path does not work. Confirmed via the SambaNova community forum: multiple users reporting the same issue, with staff response *"manually @ Coby in the forum and I'll move you over."* A portfolio demo cannot depend on a forum @-mention to function. Decision: drop SambaNova entirely, ship Bedrock-only, reframe the project from "multi-cloud comparison" to "deliberate engineering choice to cut an unreliable provider."
+
+### Frontend strip — `frontend/index.html` (1443 → 1347 lines, 17 edits) | commit `430d8ab`
+- Removed: desktop and mobile engine-toggle markup (`#engine-select`, `#mob-engine-select`)
+- Removed: associated CSS rules (`.engine-toggle`, `.mob-engine-row`, both selector blocks)
+- Removed: JS functions `getActiveEngine()`, `appendRateLimitCard()`, mobSel↔deskSel sync handlers
+- Removed: `data.error_type === 'rate_limit'` branch in `submitQuery()`
+- Removed: `via X` engine label meta line on the answer card
+- Modified: `submitQuery`, `animateProcessingStates`, `callApi`, `appendAnswerCard` signatures dropped `engine` param; `callApi` body no longer sends `selected_engine`
+- Modified: top-bar subtitle → *"Personal corpus + AWS Well-Architected · powered by Bedrock"*
+- Modified: empty-state subhead → *"Ask questions about Jimmy's background or the AWS Well-Architected Framework. Answers are retrieval-grounded across both knowledge bases via AWS Bedrock."*
+- Modified: animateProcessingStates state #3 → *"Building prompt context..."* (replaced `"Routing to ${engineLabel}..."` — that label only made sense in dual-provider; in single-provider it was animation theater. The new text describes what's actually happening — chunk merging and prompt assembly — so it's honest, not filler.)
+- Modified: About modal "Generation" bullet → *"AWS Bedrock — Claude Haiku 4.5 via cross-region inference profile"*
+- Verification grep — `engine|samba|nebius|provider`, `rate.limit|error_type`, `getActiveEngine|appendRateLimitCard|engine-select|mob-engine-select|engine-toggle|mob-engine-row` → all zero hits
+
+### Lambda strip — `src/lambdas/query/handler.py` (468 → 300 lines, ~36% reduction) | commit `636891c`
+- Removed functions: `_generate_sambanova()`, `_get_sambanova_api_key()`, `_warmup_sambanova()`
+- Removed imports: `time`, `urllib.request`, `urllib.error`
+- Removed AWS clients: `ssm` boto3 client (no SSM reads remaining)
+- Removed constants: `SAMBANOVA_ENDPOINT`, `SAMBANOVA_MODEL`, `SSM_KEY_PATH`
+- Removed: provider routing if/else, `selected_engine` parsing/validation, `[INFO] Engine: ...` log line
+- Removed: `engine_used` field from API response payload
+- Removed: `sambanova_rate_limited` sentinel handling
+- Removed: `_warmup_sambanova()` call in warmup branch — warmup branch now only primes index cache. The CLAUDE.md "permanent SambaNova warmup ping" rule was explicitly overridden by this rework per Jimmy's approval.
+- Modified: `_generate_bedrock` signature returns `str | None` (no engine label tuple)
+- Modified: AccessDeniedException user message → *"The AI provider is temporarily unavailable. Please try again in a moment."* (no provider name in user-facing copy; internal log labels stay specific)
+- Modified: docstring → Bedrock-only path description
+- Verification grep with whole-word boundaries → zero hits
+
+### Live API verification (post-Lambda deploy)
+- `POST /query` body `{"query":"What is the NTCIP simulator?"}` → HTTP 200
+- Response keys: `['answer', 'sources']` — `engine_used` confirmed absent
+- New container `0eb78529...`: query path executed cleanly; warmup path emits only `[INFO] Warm-up ping received`, `[INFO] Using cached vector index`, `[INFO] Warmup: index cache primed (2027 chunks)` — no SambaNova references
+
+### CloudFormation strip — DEFERRED to Phase 12
+Original Step 4 plan was to remove the `SambanovaApiKeyPath` parameter, `QueryLambdaRole` SSMGetParameter statement, `SAMBANOVA_API_KEY_PATH` env var on `QueryLambda`, and stale `Nebius cold start 4,986ms / Bedrock 4,281ms` comment from `infrastructure/cloudformation/template.yaml`.
+
+Skipped after discovery during verification: the live `rag-knowledge-chatbot` CFN stack has significant drift from the local template across three axes (parameters, env vars, missing resources) plus a Lambda code S3-key reference that points to stale code. `aws cloudformation update-stack` against the live stack would fail with `AlreadyExistsException` on the warmup resources, or it would revert the live Lambda to the stale SambaNova-era zip in S3.
+
+Direct CLI cleanup of the dead env var and SSM IAM permission was rejected — it would make drift worse, not better. Full IaC realignment is the correct long-term answer but is out of scope for this rework. See Phase 12 candidate.
+
+**Net effect:** live Lambda still has `NEBIUS_API_KEY_PATH` env var and `QueryLambdaRole` still has unused `SSMGetParameter` permission. Both are dead config — no functional impact on Bedrock-only operation.
+
+### Docs sweep — tagged `v1.2-bedrock-only` (commit hash resolves via `git rev-parse v1.2-bedrock-only`)
+- `README.md` — SambaNova removed from opening paragraph, What This Project Is, Architecture, Tech Stack, Engineering Decisions, Cost Guardrails, Current Status. CloudFormation IaC claim retained (the IaC is real — the drift story is internal cruft, not a portfolio honesty issue).
+- `CLAUDE.md` — provider section reduced to Bedrock-only. Permanent note added re: `rag-knowledge-chatbot` stack drift and prohibition on `aws cloudformation update-stack` until Phase 12 ships. SambaNova free-tier-trap kept as a permanent lesson.
+- `portfolio-context/CONTEXT.md` — RAG status set to `v1.2-bedrock-only`; Phase 12 IaC realignment listed as deferred. Separate repo, separate commit.
+- `PROJECT_PLANNING_MULTICLOUD.md` — Phase 11 + Phase 12 candidate entries (this section); filename annotation added at top.
+- `advanced-projects` repo — out of scope for this session, handled separately by Jimmy. Portfolio-page surfaces may lag the live site by short windows per the workflow note at the top of this doc.
+
+### What did NOT ship
+- Removal of `/rag-chatbot/sambanova-api-key` SSM parameter (kept per existing rollback rule)
+- Removal of `/rag-chatbot/nebius-api-key` SSM parameter (kept — do not delete before 2026-05-19)
+- CloudFormation template edits (deferred — Phase 12)
+- Live Lambda env var cleanup (deferred — Phase 12)
+- Live IAM SSM permission cleanup (deferred — Phase 12)
+- EventBridge warmup rule changes (rule and permission stay untouched per scope)
+
+---
+
+## Phase 12 Candidates
+
+### IaC Drift Realignment — Phase 12 Candidate
+
+**Why this is needed:** The live `rag-knowledge-chatbot` CFN stack has drifted from the local template at `infrastructure/cloudformation/template.yaml` along three axes. Until realigned, the template cannot be safely deployed via `aws cloudformation update-stack` — the update would fail with `AlreadyExistsException` on the warmup resources, or it would revert the Lambda code by re-pulling a stale S3 zip. All infra changes must use direct CLI in the meantime. This is a known internal issue, **not a portfolio honesty issue** — the IaC IS real and successfully manages 24 resources. The drift is in what the template declares vs what the live stack tracks.
+
+**Live stack name:** `rag-knowledge-chatbot` (NOT `rag-chatbot-dev` — that is a separate abandoned shell).
+
+**Abandoned shell stack:** `rag-chatbot-dev`. Status: `REVIEW_IN_PROGRESS` since 2026-04-17. Manages zero resources. Two failed change sets from `aws cloudformation deploy` attempts. Safe to delete in Phase 12 cleanup.
+
+**Drift axes:**
+
+1. **Parameter names**
+   - Live stack: `NebiusApiKeyPath = /rag-chatbot/nebius-api-key`
+   - Local template: `SambanovaApiKeyPath = /rag-chatbot/sambanova-api-key`
+   - Local template was rewritten during the dual-provider migration but never re-deployed.
+
+2. **Lambda env vars on `rag-chatbot-query-dev`**
+   - Live: `S3_BUCKET`, `INDEX_CACHE_VERSION=1`, `NEBIUS_API_KEY_PATH`
+   - Local template declares: `S3_BUCKET`, `SAMBANOVA_API_KEY_PATH`, `ENVIRONMENT`
+   - Direct mismatch — `INDEX_CACHE_VERSION` (permanent per CLAUDE.md) and `NEBIUS_API_KEY_PATH` (dead config) exist live but not in template; `SAMBANOVA_API_KEY_PATH` and `ENVIRONMENT` are in template but not live.
+
+3. **Resources missing from live stack**
+   - `QueryLambdaWarmupRule` (EventBridge rule `rag-chatbot-warmup-dev`) — created via direct CLI in Phase 5/6, never imported into stack.
+   - `QueryLambdaWarmupPermission` (Lambda permission for EventBridge) — same story.
+   - Both function correctly in production. They are simply not under CloudFormation management.
+
+**Lambda code reference drift:** The template specifies `Code.S3Key: lambda/query.zip` for `QueryLambda`. The live Lambda code was deployed via `aws lambda update-function-code --zip-file fileb://...` (bypassing S3) for v1.1 (SambaNova migration) and again for v1.2 (Bedrock-only rework). The S3 object at `s3://rag-chatbot-603509861186-dev/lambda/query.zip` is stale — it contains old SambaNova-era code. Any CFN action that triggers a Lambda code redeploy would revert the live Lambda to the stale zip.
+
+**Required Phase 12 work:**
+1. Realign local template with live state — drop `SambanovaApiKeyPath` parameter and `SAMBANOVA_API_KEY_PATH` env var; declare actual live env-var set including `INDEX_CACHE_VERSION`.
+2. Push current Bedrock-only `query.zip` to `s3://rag-chatbot-603509861186-dev/lambda/query.zip` so the template's `Code.S3Key` reference matches live code.
+3. Run a CloudFormation **resource import** to bring `QueryLambdaWarmupRule` and `QueryLambdaWarmupPermission` under stack management. Requires per-resource import config.
+4. Delete the abandoned `rag-chatbot-dev` shell stack (no resources, zero risk).
+5. Once stack and template are realigned, complete the Step 4 work that was deferred in v1.2: drop the dead `NEBIUS_API_KEY_PATH` env var from QueryLambda and remove `SSMGetParameter` from `QueryLambdaRole`. Apply via CFN update.
+
+**Estimated scope:** 4–6 hours, dedicated session. Includes a stack-realignment dry run, change-set review, and post-realignment smoke test.
+
+**Why deferred:** Out of scope for v1.2 SambaNova strip. Live functional behavior unaffected by the drift — both warmup and query paths run correctly. The dead env var and SSM IAM are cosmetic cruft, not bugs. Best handled as a dedicated IaC-hygiene session.
+
+### Filename Cleanup — Phase 12 Candidate
+Rename `PROJECT_PLANNING_MULTICLOUD.md` → `PROJECT_PLANNING.md` after IaC realignment ships. Single `git mv` plus updates to two `README.md` references. Currently annotated in-place to avoid breaking links during the rework.
 
 ---
 
