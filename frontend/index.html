@@ -103,32 +103,6 @@
 
     .top-bar__spacer { flex: 1; }
 
-    .engine-toggle {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--color-text-secondary);
-      white-space: nowrap;
-    }
-
-    .engine-toggle select {
-      background: var(--color-card-bg);
-      color: var(--color-text-primary);
-      border: 1px solid var(--color-card-border);
-      border-radius: var(--radius-sm);
-      padding: 5px 10px;
-      font-size: 12px;
-      font-family: var(--font-stack);
-      cursor: pointer;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-
-    .engine-toggle select:focus {
-      border-color: var(--color-accent);
-    }
-
     .btn-clear {
       background: transparent;
       border: 1px solid var(--color-card-border);
@@ -731,7 +705,6 @@
     /* ── DESKTOP: hide mobile-only controls ───────────────── */
     .mob-hamburger,
     .mob-info,
-    .mob-engine-row,
     .mob-sidebar-clear,
     .mob-backdrop { display: none; }
 
@@ -744,7 +717,6 @@
       .top-bar__divider,
       .kb-status,
       .top-bar__spacer,
-      .engine-toggle,
       .btn-clear { display: none; }
       .top-bar__brand { flex: 1; min-width: 0; }
 
@@ -814,30 +786,6 @@
 
       /* Input area: flex layout pins it naturally; no override needed */
 
-      /* Mobile engine row above input */
-      .mob-engine-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 12px;
-        color: var(--color-text-secondary);
-      }
-      .mob-engine-row label { white-space: nowrap; }
-      .mob-engine-row select {
-        background: var(--color-card-bg);
-        color: var(--color-text-primary);
-        border: 1px solid var(--color-card-border);
-        border-radius: var(--radius-sm);
-        padding: 5px 10px;
-        font-size: 16px;
-        font-family: var(--font-stack);
-        cursor: pointer;
-        outline: none;
-        flex: 1;
-        transition: border-color 0.15s;
-      }
-      .mob-engine-row select:focus { border-color: var(--color-accent); }
-
       /* Hide chips on mobile (space-constrained) */
       .chip-row { display: none; }
 
@@ -876,7 +824,7 @@
     </button>
     <div class="top-bar__brand">
       <div>RAG <span>Knowledge</span> Chatbot</div>
-      <div class="top-bar__subtitle">Multi-cloud retrieval · 2 knowledge bases · AWS Bedrock + SambaNova</div>
+      <div class="top-bar__subtitle">Personal corpus + AWS Well-Architected · powered by Bedrock</div>
     </div>
     <div class="top-bar__divider"></div>
     <div class="kb-status">
@@ -884,13 +832,6 @@
       Knowledge Bases Online
     </div>
     <div class="top-bar__spacer"></div>
-    <div class="engine-toggle">
-      <label for="engine-select">AI Engine:</label>
-      <select id="engine-select">
-        <option value="bedrock" selected>AWS Bedrock — Claude Haiku 4.5</option>
-        <option value="sambanova">SambaNova — Llama 3.3</option>
-      </select>
-    </div>
     <button class="btn-clear" id="btn-clear">Clear Session</button>
     <button class="mob-info" id="mob-info" aria-label="View retrieved sources">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
@@ -943,7 +884,7 @@
       <div class="qa-thread" id="qa-thread">
         <div class="empty-state" id="empty-state">
           <div class="empty-state__headline">Ask anything about Jimmy's projects, AWS work, or technical background</div>
-          <div class="empty-state__subhead">Powered by AWS Bedrock (Claude Haiku 4.5) and SambaNova (Llama 3.3-70B). Switch engines in the top bar to compare.</div>
+          <div class="empty-state__subhead">Ask questions about Jimmy's background or the AWS Well-Architected Framework. Answers are retrieval-grounded across both knowledge bases via AWS Bedrock.</div>
           <div class="empty-state__prompts">
             <div class="empty-state__prompt-group">
               <div class="empty-state__prompt-group-label">Jimmy's Background</div>
@@ -961,13 +902,6 @@
         </div>
       </div>
       <div class="input-area">
-        <div class="mob-engine-row">
-          <label for="mob-engine-select">AI Engine:</label>
-          <select id="mob-engine-select">
-            <option value="bedrock" selected>AWS Bedrock — Claude Haiku 4.5</option>
-            <option value="sambanova">SambaNova — Llama 3.3</option>
-          </select>
-        </div>
         <div class="chip-row" id="chip-row"></div>
         <div class="input-row">
           <textarea
@@ -1102,7 +1036,6 @@
 
       const input     = document.getElementById('query-input');
       const submitBtn = document.getElementById('btn-submit');
-      const engine    = getActiveEngine();
 
       input.value = '';
       input.style.height = 'auto';
@@ -1115,12 +1048,12 @@
       appendQuestionCard(question);
       const processingCard = appendProcessingCard();
 
-      await animateProcessingStates(processingCard, engine);
+      await animateProcessingStates(processingCard);
 
       let data = null;
       let errorMsg = null;
       try {
-        data = await callApi(question, engine, controller.signal);
+        data = await callApi(question, controller.signal);
       } catch (err) {
         if (err.name === 'AbortError') return;
         errorMsg = err.message;
@@ -1131,11 +1064,8 @@
       if (errorMsg) {
         appendErrorCard(errorMsg);
         resetSources();
-      } else if (data && data.error_type === 'rate_limit') {
-        appendRateLimitCard(data.message);
-        resetSources();
       } else {
-        appendAnswerCard(data, engine);
+        appendAnswerCard(data);
         renderSources(data.sources || []);
       }
 
@@ -1146,12 +1076,11 @@
     }
 
     // ── PROCESSING ANIMATION ──────────────────────────────────
-    function animateProcessingStates(card, engine) {
-      const engineLabel = engine === 'sambanova' ? 'SambaNova Llama 3.3' : 'AWS Bedrock Claude';
+    function animateProcessingStates(card) {
       const states = [
         'Embedding query...',
         'Searching knowledge base...',
-        `Routing to ${engineLabel}...`,
+        'Building prompt context...',
         'Generating answer...'
       ];
 
@@ -1170,13 +1099,13 @@
     }
 
     // ── API ───────────────────────────────────────────────────
-    async function callApi(query, engine, signal) {
+    async function callApi(query, signal) {
       let response;
       try {
         response = await fetch(API_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, selected_engine: engine }),
+          body: JSON.stringify({ query }),
           signal
         });
       } catch (err) {
@@ -1196,11 +1125,6 @@
       }
 
       return json;
-    }
-
-    // ── ENGINE ────────────────────────────────────────────────
-    function getActiveEngine() {
-      return document.getElementById('engine-select').value;
     }
 
     // ── RENDER: CARDS ─────────────────────────────────────────
@@ -1228,17 +1152,14 @@
       return card;
     }
 
-    function appendAnswerCard(data, engine) {
-      const engineUsed  = data.engine_used || engine;
-      const engineLabel = engineUsed === 'sambanova' ? 'SambaNova — Llama 3.3' : 'AWS Bedrock Claude';
-      const answerText  = (data.answer || '').trim() || '(No answer returned)';
+    function appendAnswerCard(data) {
+      const answerText = (data.answer || '').trim() || '(No answer returned)';
 
       const card = document.createElement('div');
       card.className = 'card card--answer';
       card.innerHTML = `
         <div class="card__label card__label--answer">Answer</div>
         <div class="card__text">${escHtml(answerText)}</div>
-        <div class="card__meta">via ${escHtml(engineLabel)}</div>
       `;
       appendToThread(card);
     }
@@ -1249,17 +1170,6 @@
       card.innerHTML = `
         <div class="card__label card__label--error">Error</div>
         <div class="card__text">${escHtml(message)}</div>
-      `;
-      appendToThread(card);
-    }
-
-    function appendRateLimitCard(message) {
-      const card = document.createElement('div');
-      card.className = 'card card--error';
-      card.innerHTML = `
-        <div class="card__label card__label--error">Rate Limited</div>
-        <div class="card__text">${escHtml(message)}</div>
-        <div class="card__meta">Switch to <strong>AWS Bedrock</strong> using the provider selector above, then retry your question.</div>
       `;
       appendToThread(card);
     }
@@ -1351,8 +1261,6 @@
       const backdrop   = document.getElementById('mob-backdrop');
       const sidebar    = document.querySelector('.sidebar');
       const rightPanel = document.querySelector('.right-panel');
-      const mobSel     = document.getElementById('mob-engine-select');
-      const deskSel    = document.getElementById('engine-select');
       const clearSidebar = document.getElementById('btn-clear-sidebar');
 
       function openSidebar() {
@@ -1380,10 +1288,6 @@
         rightPanel.classList.contains('mob-open') ? closeRightPanel() : openRightPanel());
 
       backdrop.addEventListener('click', closeAll);
-
-      // Keep engine selects in sync
-      mobSel.addEventListener('change', () => { deskSel.value = mobSel.value; });
-      deskSel.addEventListener('change', () => { mobSel.value = deskSel.value; });
 
       // Mobile clear session (sidebar)
       clearSidebar.addEventListener('click', () => { clearSession(); closeAll(); });
@@ -1431,7 +1335,7 @@
         <ul>
           <li><strong>Embeddings:</strong> Amazon Titan Embeddings v2 — 1536-dimension vectors stored as a JSON index in S3</li>
           <li><strong>Retrieval:</strong> Cosine similarity search running inside AWS Lambda over the S3 vector index — no managed vector DB</li>
-          <li><strong>Generation:</strong> Dual-provider router — AWS Bedrock (Claude Haiku 4.5) or SambaNova (Llama 3.3-70B), selectable in real time</li>
+          <li><strong>Generation:</strong> AWS Bedrock — Claude Haiku 4.5 via cross-region inference profile</li>
           <li><strong>Infrastructure:</strong> API Gateway, Lambda, S3, CloudFront, CloudFormation IaC</li>
           <li><strong>Observability:</strong> CloudWatch dashboard, p95 latency + error-rate alarms, SNS alerts</li>
         </ul>
