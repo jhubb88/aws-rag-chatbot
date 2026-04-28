@@ -1,11 +1,7 @@
-# RAG Knowledge Chatbot — Project Planning Document
-### Multi-Cloud Edition (historical name — see note below) | Last Updated: 2026-04-27
+# RAG Knowledge Chatbot — Build Log
+### Last Updated: 2026-04-28
 
-> This is the source-of-truth project log for the RAG Knowledge Chatbot. Every phase, decision, deferred item, and commit reference lives here.
->
-> **Note on filename:** This file is named `PROJECT_PLANNING_MULTICLOUD.md` for historical reasons — the project originally shipped as a multi-cloud demo (AWS Bedrock + SambaNova). As of `v1.2-bedrock-only` (2026-04-27), the project is Bedrock-only — see Phase 11. The "MULTICLOUD" suffix is preserved to avoid breaking existing links and references; rename to `PROJECT_PLANNING.md` is a Phase 12 cleanup candidate.
->
-> Note: portfolio-page surfaces (advanced-projects repo) are handled in a separate workflow and may lag the live site by short windows.
+> This is the source-of-truth build log for the RAG Knowledge Chatbot. Every phase, decision, deferred item, and commit reference lives here. Note: portfolio-page surfaces (advanced-projects repo) are handled in a separate workflow and may lag the live site by short windows.
 
 **Phase 1 Status:** ✅ Complete — stack deployed, commit `68a92b6`, tag `v0.2-infra`
 **Phase 2 Status:** ✅ Complete — ingest Lambda deployed, Titan Embeddings v2 unblocked, commit `61ee46e`, tag `v0.3-ingest`
@@ -491,7 +487,7 @@ Direct CLI cleanup of the dead env var and SSM IAM permission was rejected — i
 - `README.md` — SambaNova removed from opening paragraph, What This Project Is, Architecture, Tech Stack, Engineering Decisions, Cost Guardrails, Current Status. CloudFormation IaC claim retained (the IaC is real — the drift story is internal cruft, not a portfolio honesty issue).
 - `CLAUDE.md` — provider section reduced to Bedrock-only. Permanent note added re: `rag-knowledge-chatbot` stack drift and prohibition on `aws cloudformation update-stack` until Phase 12 ships. SambaNova free-tier-trap kept as a permanent lesson.
 - `portfolio-context/CONTEXT.md` — RAG status set to `v1.2-bedrock-only`; Phase 12 IaC realignment listed as deferred. Separate repo, separate commit.
-- `PROJECT_PLANNING_MULTICLOUD.md` — Phase 11 + Phase 12 candidate entries (this section); filename annotation added at top.
+- `BUILD_LOG.md` — Phase 11 + Phase 12 candidate entries (this section). Renamed from PROJECT_PLANNING_MULTICLOUD.md as a v1.2 follow-up.
 - `advanced-projects` repo — out of scope for this session, handled separately by Jimmy. Portfolio-page surfaces may lag the live site by short windows per the workflow note at the top of this doc.
 
 ### What did NOT ship
@@ -543,9 +539,6 @@ Direct CLI cleanup of the dead env var and SSM IAM permission was rejected — i
 **Estimated scope:** 4–6 hours, dedicated session. Includes a stack-realignment dry run, change-set review, and post-realignment smoke test.
 
 **Why deferred:** Out of scope for v1.2 SambaNova strip. Live functional behavior unaffected by the drift — both warmup and query paths run correctly. The dead env var and SSM IAM are cosmetic cruft, not bugs. Best handled as a dedicated IaC-hygiene session.
-
-### Filename Cleanup — Phase 12 Candidate
-Rename `PROJECT_PLANNING_MULTICLOUD.md` → `PROJECT_PLANNING.md` after IaC realignment ships. Single `git mv` plus updates to two `README.md` references. Currently annotated in-place to avoid breaking links during the rework.
 
 ---
 

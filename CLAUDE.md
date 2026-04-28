@@ -70,7 +70,7 @@ SambaNova's free tier was 20 RPD on Llama 3.3-70B (verified via API response hea
 - SSM Nebius API key path: /rag-chatbot/nebius-api-key (DORMANT — do not delete before 2026-05-19)
 
 ## CloudFormation Stack — DRIFT WARNING (added v1.2)
-The `rag-knowledge-chatbot` CFN stack has drifted from the local template. Until Phase 12 realignment is complete, do NOT run `aws cloudformation update-stack` against this stack — the update will fail (`AlreadyExistsException` on warmup resources) or revert Lambda code (template's `Code.S3Key` points to stale zip). All infra changes must use direct CLI until realignment ships. Live stack name is `rag-knowledge-chatbot`, NOT `rag-chatbot-dev` (which is an abandoned `REVIEW_IN_PROGRESS` shell). Full drift inventory in `PROJECT_PLANNING_MULTICLOUD.md` Phase 12 candidate.
+The `rag-knowledge-chatbot` CFN stack has drifted from the local template. Until Phase 12 realignment is complete, do NOT run `aws cloudformation update-stack` against this stack — the update will fail (`AlreadyExistsException` on warmup resources) or revert Lambda code (template's `Code.S3Key` points to stale zip). All infra changes must use direct CLI until realignment ships. Live stack name is `rag-knowledge-chatbot`, NOT `rag-chatbot-dev` (which is an abandoned `REVIEW_IN_PROGRESS` shell). Full drift inventory in `BUILD_LOG.md` Phase 12 candidate.
 
 ## iOS / Mobile CSS Rules
 

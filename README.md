@@ -71,14 +71,14 @@ data/
 docs/              Planning docs, architecture decisions, cost guardrails
 tests/             Smoke tests
 CLAUDE.md          Working rules for Claude Code sessions on this repo
-PROJECT_PLANNING_MULTICLOUD.md   Full phase-by-phase build log (filename retained for historical reasons — see Phase 11)
+BUILD_LOG.md   Full phase-by-phase build log
 ```
 
 ---
 
 ## Engineering Decisions
 
-A handful of trade-offs worth calling out. Full phase log lives in `PROJECT_PLANNING_MULTICLOUD.md`.
+A handful of trade-offs worth calling out. Full phase log lives in `BUILD_LOG.md`.
 
 **Custom retrieval over Bedrock Knowledge Bases.**
 Managed KBs abstract away the retrieval layer and hide the interesting engineering. Writing the chunker, embedding pipeline, and cosine search from scratch forced real decisions about chunk size, overlap, and index format.
@@ -120,9 +120,9 @@ Hard cap enforced at $20 via AWS Budgets. See `docs/COST_GUARDRAILS.md`.
 
 ## Current Status
 
-`v1.2-bedrock-only` tagged. Bedrock-only generation. Dual-KB retrieval operational. Mobile responsive. EventBridge warmup running with index cache priming — first-touch cold ~4.7s Lambda, warm queries 5–6s. Full deployment history in `PROJECT_PLANNING_MULTICLOUD.md`.
+`v1.2-bedrock-only` tagged. Bedrock-only generation. Dual-KB retrieval operational. Mobile responsive. EventBridge warmup running with index cache priming — first-touch cold ~4.7s Lambda, warm queries 5–6s. Full deployment history in `BUILD_LOG.md`.
 
-Deferred candidates (no active work): index format optimization, response streaming, IaC drift realignment (Phase 12). See PROJECT_PLANNING_MULTICLOUD.md.
+Deferred candidates (no active work): index format optimization, response streaming, IaC drift realignment (Phase 12). See BUILD_LOG.md.
 
 ## Supported Platforms
 
