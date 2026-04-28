@@ -498,6 +498,18 @@ Direct CLI cleanup of the dead env var and SSM IAM permission was rejected — i
 - Live IAM SSM permission cleanup (deferred — Phase 12)
 - EventBridge warmup rule changes (rule and permission stay untouched per scope)
 
+### Phase 11 follow-up — Processing animation polish (2026-04-28) | commit `<hash-pending>`
+
+Post-v1.2 perception fix for the "Generating answer..." stage of the processing animation. Bedrock generation is ~80% of warm query wall time; the static label sat for several seconds reading as stalled even though the spinner was still moving. Three changes shipped together in one frontend-only commit:
+
+- **Rotating sub-text** below the headline, cycling every 1200ms through *"Drafting response..."* → *"Pulling from retrieved chunks..."* → *"Refining wording..."* → *"Almost there..."* and looping. Implemented as a `setInterval` inside `animateProcessingStates`; the interval self-clears on the next tick whenever the card is no longer in the DOM (covers success removal, error removal, and Clear Session abort — single source of truth, no scattered cleanup logic).
+- **Border-edge pulse** via new `@keyframes generating-pulse` (1.8s ease-in-out cycle, soft `box-shadow: -3px 0 14px -2px var(--color-accent)` glow). Applied via `.card--generating` class added when the generating phase starts. Suppressed under `prefers-reduced-motion: reduce`.
+- **Sub-text rotation continues under reduced-motion** — text content updates aren't vestibular motion, and suppressing them would return reduced-motion users to the static-stalled state we're fixing.
+
+**Real-time win as a side effect.** Pre-fix `animateProcessingStates` scheduled one more 650ms `setTimeout` after the final state painted before resolving. The restructure resolves immediately when the generating phase begins, so the API call kicks off ~650ms earlier than before. Real-time win on top of the perception fix.
+
+Frontend-only change. No tag bump. Deployed via S3 + CloudFront `/*` invalidation `I21SEANE8SKG2E6XT2LJQDZ8P1`.
+
 ---
 
 ## Phase 12 Candidates
