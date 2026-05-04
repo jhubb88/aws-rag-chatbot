@@ -76,6 +76,24 @@ BUILD_LOG.md   Full phase-by-phase build log
 
 ---
 
+## Deployment
+
+Frontend deploys via push-triggered CI/CD. Pushing to `main` with changes under `frontend/**` triggers `.github/workflows/deploy.yml`, which syncs `frontend/` to the project S3 bucket and invalidates the CloudFront distribution.
+
+**Pipeline:**
+- Trigger: push to `main` modifying `frontend/**` or the workflow file (also `workflow_dispatch` for manual runs)
+- Auth: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` GitHub secrets on `jhubb88/aws-rag-chatbot`
+- Sync: `aws s3 sync frontend/ s3://rag-chatbot-603509861186-dev/` (no `--delete`)
+- Invalidate: `aws cloudfront create-invalidation --paths "/*"` against distribution `EN88LEBW14923`
+
+**Why no `--delete`:** the S3 bucket is shared with RAG infrastructure — `documents/` holds the 61MB vector index, `lambda/` holds Lambda deployment packages, `cloudtrail/` holds audit logs. A `--delete`-flagged sync would wipe the knowledge base and break the query Lambda. The workflow file carries an explicit warning above the sync step.
+
+**Why `/*` invalidation:** verified 2026-04-19 that `/index.html`-only invalidations on this distribution do not reliably clear the cache; `/*` does. Documented quirk; do not narrow.
+
+Backend Lambda code and CloudFormation infra are not touched by this pipeline — IaC realignment is deferred (Phase 12, see BUILD_LOG.md).
+
+---
+
 ## Engineering Decisions
 
 A handful of trade-offs worth calling out. Full phase log lives in `BUILD_LOG.md`.
