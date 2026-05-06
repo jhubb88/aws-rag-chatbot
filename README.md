@@ -70,8 +70,6 @@ data/
   curated/         Hand-authored Q&A chunks (tracked)
 docs/              Planning docs, architecture decisions, cost guardrails
 tests/             Smoke tests
-CLAUDE.md          Working rules for Claude Code sessions on this repo
-BUILD_LOG.md   Full phase-by-phase build log
 ```
 
 ---
@@ -90,13 +88,13 @@ Frontend deploys via push-triggered CI/CD. Pushing to `main` with changes under 
 
 **Why `/*` invalidation:** verified 2026-04-19 that `/index.html`-only invalidations on this distribution do not reliably clear the cache; `/*` does. Documented quirk; do not narrow.
 
-Backend Lambda code and CloudFormation infra are not touched by this pipeline — IaC realignment is deferred (Phase 12, see BUILD_LOG.md).
+Backend Lambda code and CloudFormation infra are not touched by this pipeline — IaC realignment is on the backlog.
 
 ---
 
 ## Engineering Decisions
 
-A handful of trade-offs worth calling out. Full phase log lives in `BUILD_LOG.md`.
+A handful of trade-offs worth calling out.
 
 **Custom retrieval over Bedrock Knowledge Bases.**
 Managed KBs abstract away the retrieval layer and hide the interesting engineering. Writing the chunker, embedding pipeline, and cosine search from scratch forced real decisions about chunk size, overlap, and index format.
@@ -109,9 +107,6 @@ Initial retrieval scores for open-ended queries were under 0.30. Shrinking chunk
 
 **Top-k = 5, not 3.**
 Running top-k=3 against a 2,027-chunk index missed enumeration chunks that scored 0.40+ but got outranked by narrative chunks sharing query vocabulary. Raising to 5 added ~650ms of context processing and fixed the "What projects has Jimmy built?" incomplete-answer problem.
-
-**Single-provider rework: SambaNova → Bedrock-only (v1.2).**
-The project shipped originally as a multi-cloud demo with a Bedrock/SambaNova toggle. SambaNova's free tier (20 RPD on Llama 3.3-70B, verified via API response headers) is insufficient for portfolio demo traffic, and the documented Developer Tier upgrade (48K RPD with card on file) is broken in SambaNova's billing migration — the auto-upgrade does not work, and the staff workaround is "manually @ a moderator in the forum." A portfolio demo cannot depend on a forum @-mention to function. The right call was to drop SambaNova entirely and reframe the project around a single reliable provider rather than ship a flaky comparison feature. Full rationale in Phase 11 of the planning doc.
 
 **Warmup does two things, not one.**
 The EventBridge ping keeps the Lambda container alive — that's the obvious function. The second function was added after diagnosing real failure modes in production: the warmup branch calls `_load_index()` to pre-populate the module-level `_index_cache` — every container spawned by a warmup ping has the 58MB index ready before the first real user query, eliminating the ~6s S3-load penalty that previously hit every container's first touch. Measured impact: first-touch cold dropped from ~8.3s Lambda (6s S3 load + ~2s Bedrock) to ~4.7s Lambda (cache hit + ~4s Bedrock).
@@ -138,18 +133,26 @@ Hard cap enforced at $20 via AWS Budgets. See `docs/COST_GUARDRAILS.md`.
 
 ## Current Status
 
-`v1.2-bedrock-only` tagged. Bedrock-only generation. Dual-KB retrieval operational. Mobile responsive. EventBridge warmup running with index cache priming — first-touch cold ~4.7s Lambda, warm queries 5–6s. Full deployment history in `BUILD_LOG.md`.
+`v1.2-bedrock-only` tagged. Bedrock-only generation. Dual-KB retrieval operational. Mobile responsive. EventBridge warmup running with index cache priming — first-touch cold ~4.7s Lambda, warm queries 5–6s.
 
-Deferred candidates (no active work): index format optimization, response streaming, IaC drift realignment (Phase 12). See BUILD_LOG.md.
+Deferred candidates (no active work): index format optimization, response streaming, IaC drift realignment.
 
 ## Supported Platforms
 
 **Fully supported:** desktop browsers (Chrome, Firefox, Safari, Edge), iPhone Safari.
 
-**Known issue — iPad Safari:** After using Clear Session and running a second query, the top bar and panel controls may become unresponsive. The chat input and center panel remain functional. Workaround: reload the page. Deferred as low-priority — the demo audience is primarily desktop and iPhone. Documented in the project planning doc.
+**Known issue — iPad Safari:** After using Clear Session and running a second query, the top bar and panel controls may become unresponsive. The chat input and center panel remain functional. Workaround: reload the page. Deferred as low-priority — the demo audience is primarily desktop and iPhone.
 
 ---
 
 ## License
 
-Portfolio project. Code available for reference; no redistribution license granted.
+MIT — see [LICENSE](LICENSE)
+
+## Author
+
+Jimmy Hubbard — [github.com/jhubb88](https://github.com/jhubb88)
+
+---
+
+*Part of [jhubb88's portfolio](https://jimmyhubbard2.cc)*
