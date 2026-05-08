@@ -29,7 +29,7 @@ jobs:
       # Bucket cleanup happens manually if at all.
       - name: Sync frontend to S3
         run: |
-          aws s3 sync frontend/ s3://rag-chatbot-603509861186-dev/ \
+          aws s3 sync frontend/ s3://rag-chatbot-603509861186-dev/frontend/ \
             --exclude ".gitkeep"
 
       - name: Invalidate CloudFront
