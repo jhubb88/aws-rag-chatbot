@@ -11,11 +11,6 @@ Parameters:
     AllowedValues: [dev, prod]
     Description: Deployment environment
 
-  SambanovaApiKeyPath:
-    Type: String
-    Default: /rag-chatbot/sambanova-api-key
-    Description: SSM parameter path for SambaNova API key (must already exist)
-
 Resources:
 
   # ── S3: Main bucket (documents, embeddings index, frontend) ──────────────────
@@ -52,21 +47,6 @@ Resources:
             Principal: '*'
             Action: s3:GetObject
             Resource: !Sub "${RagChatbotBucket.Arn}/frontend/*"
-          - Sid: CloudTrailAclCheck
-            Effect: Allow
-            Principal:
-              Service: cloudtrail.amazonaws.com
-            Action: s3:GetBucketAcl
-            Resource: !GetAtt RagChatbotBucket.Arn
-          - Sid: CloudTrailWrite
-            Effect: Allow
-            Principal:
-              Service: cloudtrail.amazonaws.com
-            Action: s3:PutObject
-            Resource: !Sub "${RagChatbotBucket.Arn}/cloudtrail/AWSLogs/${AWS::AccountId}/*"
-            Condition:
-              StringEquals:
-                s3:x-amz-acl: bucket-owner-full-control
 
   # ── CloudWatch Log Group (Query Lambda) ──────────────────────────────────────
 
@@ -185,12 +165,6 @@ Resources:
                   - aws-marketplace:ViewSubscriptions
                   - aws-marketplace:Subscribe
                 Resource: "*"
-              # SSM — SambaNova API key
-              - Sid: SSMGetParameter
-                Effect: Allow
-                Action:
-                  - ssm:GetParameter
-                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/rag-chatbot/*"
       Tags:
         - Key: Project
           Value: rag-chatbot
@@ -386,32 +360,10 @@ Resources:
       Environment:
         Variables:
           S3_BUCKET: !Ref RagChatbotBucket
-          SAMBANOVA_API_KEY_PATH: !Ref SambanovaApiKeyPath
           ENVIRONMENT: !Ref Environment
       Tags:
         - Key: Project
           Value: rag-chatbot
-
-  # EventBridge rule: ping QueryLambda every 5 minutes to keep container warm
-  QueryLambdaWarmupRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub "rag-chatbot-warmup-${Environment}"
-      Description: "Ping QueryLambda every 5 minutes to keep container warm"
-      ScheduleExpression: "rate(5 minutes)"
-      State: ENABLED
-      Targets:
-        - Id: QueryLambdaWarmupTarget
-          Arn: !GetAtt QueryLambda.Arn
-          Input: '{"warmup": true}'
-
-  QueryLambdaWarmupPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt QueryLambda.Arn
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt QueryLambdaWarmupRule.Arn
 
   # Allows API Gateway to invoke QueryLambda
   QueryLambdaApiGatewayPermission:
@@ -598,28 +550,17 @@ Resources:
           CachedMethods: [GET, HEAD]
         PriceClass: PriceClass_100
         HttpVersion: http2
+        Aliases:
+          - rag.jimmyhubbard2.cc
+        ViewerCertificate:
+          AcmCertificateArn: arn:aws:acm:us-east-1:603509861186:certificate/598151c8-e0e7-4b46-acf0-4da54e5bce38
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
       Tags:
         - Key: Project
           Value: rag-chatbot
         - Key: Environment
           Value: !Ref Environment
-
-  # ── CloudTrail ────────────────────────────────────────────────────────────────
-
-  RagChatbotTrail:
-    Type: AWS::CloudTrail::Trail
-    DependsOn: RagChatbotBucketPolicy
-    Properties:
-      TrailName: !Sub "rag-chatbot-trail-${Environment}"
-      S3BucketName: !Ref RagChatbotBucket
-      S3KeyPrefix: cloudtrail
-      IsLogging: true
-      EnableLogFileValidation: true
-      IncludeGlobalServiceEvents: true
-      IsMultiRegionTrail: false
-      Tags:
-        - Key: Project
-          Value: rag-chatbot
 
 Outputs:
   BucketName:
@@ -663,3 +604,4 @@ Outputs:
     Value: !Sub "https://${RagChatbotCloudFront.DomainName}"
     Export:
       Name: !Sub "rag-chatbot-cloudfront-url-${Environment}"
+
