@@ -130,7 +130,7 @@ This phase explored multi-cloud generation as a portfolio signal. Nebius AI Stud
 
 ### Phase 3 — Bedrock-only rework (2026-04-27, tag `v1.2-bedrock-only`)
 
-The multi-cloud experiment was reversed. The SambaNova generation path was stripped from the query Lambda (`636891c`), the provider toggle was removed from the frontend (`430d8ab`), and the docs were updated (`694dc09`). Honest framing: multi-cloud was tried, didn't survive the simplification pass — single provider won on grounds of one fewer rate-limit to handle, one fewer timeout to tune, one fewer account to maintain, and one less surface area for failure modes that would distract from the RAG architecture itself. The planning doc was renamed from `PROJECT_PLANNING_MULTICLOUD.md` to `BUILD_LOG.md` to reflect the post-pivot scope (`d1b2955`).
+The multi-cloud experiment was reversed. The SambaNova generation path was stripped from the query Lambda (`636891c`), the provider toggle was removed from the frontend (`430d8ab`), and the docs were updated (`694dc09`). Honest framing: multi-cloud was tried, didn't survive the simplification pass — single provider won on grounds of one fewer rate-limit to handle, one fewer timeout to tune, one fewer account to maintain, and one less surface area for failure modes that would distract from the RAG architecture itself. The planning doc, originally `PROJECT_PLANNING_MULTICLOUD.md`, was renamed to reflect the post-pivot scope (`d1b2955`).
 
 ### Phase 4 — CI/CD added, then the prefix incident (2026-05-04 → 2026-05-08)
 
@@ -338,7 +338,6 @@ rag-chatbot/                              ← Lives on Windows Desktop
 │   └── workflows/
 │       └── deploy.yml                    ← Frontend-only deploy (path-filtered, no Lambda step)
 ├── .claude/, .gitignore, .playwright-mcp/  (tooling)
-├── BUILD_LOG.md                          Phase-based session journal (66 KB, retained as artifact)
 ├── CLAUDE.md                             Project-specific Claude Code instructions
 ├── LICENSE                               MIT
 ├── PROJECT_PLAN_DAY_ONE_ORIGINAL.md      Original planning doc (8.6 KB)
