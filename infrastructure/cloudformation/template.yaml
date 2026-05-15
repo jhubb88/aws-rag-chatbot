@@ -374,6 +374,34 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RagChatbotApi}/*/POST/query"
 
+  # ── EventBridge: Warmup Rule ──────────────────────────────────────────────────
+  # Pings QueryLambda every 5 minutes to keep the container warm and to pre-populate
+  # the in-Lambda vector index cache. Originally created via direct CLI (Phase 5/6)
+  # and imported into the stack during Phase 12.
+
+  QueryLambdaWarmupRule:
+    Type: AWS::Events::Rule
+    DeletionPolicy: Retain
+    Properties:
+      Name: !Sub "rag-chatbot-warmup-${Environment}"
+      Description: Ping QueryLambda every 5 minutes to keep container warm
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Id: QueryLambdaWarmupTarget
+          Arn: !GetAtt QueryLambda.Arn
+          Input: '{"warmup":true}'
+
+  # Allows EventBridge to invoke QueryLambda for the warmup ping
+  QueryLambdaWarmupPermission:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: !GetAtt QueryLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt QueryLambdaWarmupRule.Arn
+
   # ── SNS: Alert Topic ──────────────────────────────────────────────────────────
 
   RagChatbotAlertsTopic:
@@ -511,7 +539,7 @@ Resources:
               "type": "metric",
               "x": 12, "y": 6, "width": 12, "height": 6,
               "properties": {
-                "title": "Estimated Cost USD (approx — 256MB, $0.0000166667/GB-s)",
+                "title": "Estimated Cost USD (approx - 256MB, $0.0000166667/GB-s)",
                 "metrics": [
                   ["AWS/Lambda", "Duration", "FunctionName", "${QueryLambda}", {"id": "m1", "stat": "Sum", "visible": false}],
                   [{"expression": "m1 / 1000 * 0.25 * 0.0000166667", "label": "Est. Cost USD", "id": "cost"}]
@@ -533,7 +561,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: !Sub "RAG Chatbot frontend — ${Environment}"
+        Comment: !Sub "RAG Chatbot frontend - ${Environment}"
         Enabled: true
         DefaultRootObject: frontend/index.html
         Origins:
