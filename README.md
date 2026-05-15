@@ -3,6 +3,7 @@
 A serverless Retrieval-Augmented Generation chatbot on AWS. Ask questions about my engineering background or the AWS Well-Architected Framework — answers are retrieval-grounded across both knowledge bases and generated via AWS Bedrock (Claude Haiku 4.5).
 
 **Live Demo:** https://rag.jimmyhubbard2.cc
+**Full documentation:** [PROJECT_MASTER.md](./PROJECT_MASTER.md) — architecture, AWS operational reference, build history, and key decisions
 **Portfolio:** https://projects.jimmyhubbard2.cc
 
 ---
